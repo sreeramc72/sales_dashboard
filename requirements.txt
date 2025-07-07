@@ -3,4 +3,5 @@ pandas
 plotly
 scikit-learn
 mysql-connector-python
+seaborn
 # Add any other packages you use in your code

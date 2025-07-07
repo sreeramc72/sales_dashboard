@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from google.cloud import bigquery
 import mysql.connector
 import numpy as np
 from datetime import datetime, timedelta
@@ -16,7 +17,7 @@ import warnings
 import logging
 import os
 import time
-from dotenv import load_dotenv
+
 
 # Suppress warnings and configure logging
 warnings.filterwarnings('ignore')
@@ -44,8 +45,6 @@ for logger_name in ['tornado.websocket', 'tornado.iostream']:
     logger.addFilter(WebSocketErrorFilter())
     logger.setLevel(logging.ERROR)
 
-# Load environment variables
-load_dotenv("C:\\Users\\sreer\\OneDrive\\Desktop\\mysql\\.env")
 
 # Configure page
 st.set_page_config(
@@ -235,11 +234,11 @@ def load_data_from_mysql(days_back=7):
         # Show loading indicator
         with st.spinner(f"🔄 Loading data from MySQL for last {days_back} days..."):
             conn = mysql.connector.connect(
-                host=os.getenv("MYSQL_HOST"),
-                port=int(os.getenv("MYSQL_PORT", 3306)),
-                user=os.getenv("MYSQL_USER"),
-                password=os.getenv("MYSQL_PASSWORD"),
-                database=os.getenv("MYSQL_DATABASE")
+                host=st.secrets["MYSQL_HOST"],
+                port=int(st.secrets.get("MYSQL_PORT", 3306)),
+                user=st.secrets["MYSQL_USER"],
+                password=st.secrets["MYSQL_PASSWORD"],
+                database=st.secrets["MYSQL_DATABASE"]
             )
             
             # Optimized query: Select only required columns, use WHERE clause first
