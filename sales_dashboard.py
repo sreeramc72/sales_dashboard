@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from google.cloud import bigquery
 import mysql.connector
 import numpy as np
 from datetime import datetime, timedelta
@@ -286,554 +285,11 @@ def load_data_from_mysql(days_back=7):
         st.error(f"Error loading data from MySQL: {e}")
         return pd.DataFrame()
 
-@st.cache_data(ttl=3600, max_entries=20, show_spinner=False)  # Cache for 1 hour with larger cache size
-def load_data_from_bigquery(days_back=7):
-    """Ultra-optimized BigQuery data loading with performance enhancements"""
-    try:
-        # Set up progress tracking
-        progress_text = "Loading data from BigQuery..."
-        progress_bar = st.progress(0, text=progress_text)
-        
-        # Phase 1: Connection setup and query preparation
-        progress_bar.progress(5, text="Initializing BigQuery connection...")
-        
-        # Set credentials once
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-            "C:\\Users\\sreer\\OneDrive\\Desktop\\Dont delete\\"
-            "my-database-order-level-2025-92bf0e71cddc.json"
-        )
-        
-        # Create client with custom connection pool settings (increase max_connections)
-        client = bigquery.Client(client_options={
-            'api_endpoint': 'https://bigquery.googleapis.com',
-            'scopes': ['https://www.googleapis.com/auth/bigquery'],
-        })
-        
-        # Show spinner with detailed progress
-        with st.spinner('🔄 Loading optimized data from BigQuery...'):
-            # Phase 2: Query optimization
-            progress_bar.progress(10, text="Building optimized query...")
-            
-            # Use table sampling for extremely large datasets if needed
-            # Add timestamp cutoff to ensure we only look at recent data
-            timestamp_cutoff = int((datetime.utcnow() - timedelta(days=days_back)).timestamp())
-            # If ReceivedAt is in nanoseconds, multiply cutoff by 1_000_000_000
-            timestamp_cutoff *= 1_000_000_000
-
-            # MAJOR OPTIMIZATION: Use partitioning and clustering hints for maximum query efficiency
-            # Pre-filter data with partition pruning and scan minimal columns
-            query = f"""
-            SELECT 
-                OrderID, CustomerName, ReceivedAt, GrossPrice, Discount, 
-                Delivery, Tips, VAT, Surcharge, Total, 
-                Channel, Brand, Location, PaymentMethod
-            FROM `my-database-order-level-2025.order_level.sales_data`
-            /* Simple direct comparison for INT64 timestamp field */
-            WHERE ReceivedAt >= {timestamp_cutoff}
-            /* Avoid expensive ORDER BY in SQL */
-            """
-            
-            # Phase 3: Ultra-enhanced job configuration
-            progress_bar.progress(15, text="Configuring query for maximum performance...")
-            
-            # Enhanced job config with throughput-optimized settings
-            job_config = bigquery.QueryJobConfig(
-                use_query_cache=True,
-                priority=bigquery.QueryPriority.INTERACTIVE,
-                maximum_bytes_billed=100000000000,  # Set a high bytes limit
-                labels={"dashboard": "sales", "function": "load_data", "version": "extreme_optimized"},
-                query_parameters=[
-                    bigquery.ScalarQueryParameter("days_back", "INT64", days_back)
-                ]
-            )
-            
-            # Note: We don't use add_query_hint as it's not supported in this version
-            
-            # Phase 4: Execute query with robust error handling and timeout management
-            try:
-                # Submit query with optimized settings and longer timeout for larger datasets
-                progress_bar.progress(20, text="Submitting hyper-optimized query to BigQuery...")
-                start_time = time.time()
-                
-                # OPTIMIZATION: Use higher timeout for larger datasets
-                timeout = max(90, days_back * 5)  # Scale timeout with data size
-                query_job = client.query(query, job_config=job_config, timeout=timeout)
-                
-                # OPTIMIZATION: Monitor query progress with periodic updates
-                progress_bar.progress(30, text="BigQuery processing query...")
-                query_id = query_job.job_id
-                
-                # Phase 5: Hyper-optimized data streaming with progressive monitoring
-                try:
-                    # NEW OPTIMIZATION: Stream results with increased batch size for maximum throughput
-                    progress_bar.progress(45, text="Beginning data streaming with optimized batching...")
-                    
-                    # Start streaming timer
-                    start_time_fetch = time.time()
-                    
-                    # CRITICAL OPTIMIZATION: Use iterator directly with pre-allocation for memory efficiency
-                    # This avoids loading entire result set into memory at once
-                    iterator = query_job.result(page_size=10000)
-                    
-                    # Get schema for pre-allocation
-                    schema = [field.name for field in iterator.schema]
-                    
-                    # Use a reasonable default size since estimated_row_count is not available
-                    estimated_row_count = 10000
-                    
-                    # Pre-allocate with numpy arrays for extreme memory efficiency and speed
-                    # This is much faster than lists for large datasets
-                    data_dict = {}
-                    chunk_size = min(100000, estimated_row_count)  # Use chunking for very large datasets
-                    
-                    progress_bar.progress(50, text=f"Streaming data in optimized chunks...")
-                    
-                    # NEW APPROACH: Chunked streaming with vectorized operations
-                    # This dramatically reduces memory pressure and improves performance
-                    rows_list = []
-                    rows_streamed = 0
-                    total_chunks = 0
-                    
-                    # Process in chunks for better memory management and progress reporting
-                    for chunk_idx, page in enumerate(iterator.pages):
-                        total_chunks += 1
-                        chunk_rows = list(page)
-                        rows_list.extend(chunk_rows)
-                        rows_streamed += len(chunk_rows)
-                        
-                        # Update progress every few chunks
-                        if chunk_idx % 5 == 0:
-                            progress_percent = min(55, 45 + (chunk_idx * 10 / 20))  # Assume ~20 chunks as reasonable default
-                            progress_bar.progress(int(progress_percent), 
-                                                text=f"Streamed {rows_streamed:,} rows in {total_chunks} chunks...")
-                    
-                    # Empty result check
-                    if not rows_list:
-                        progress_bar.progress(100, text="No data found in query results")
-                        st.warning("⚠️ No records found for the selected time period")
-                        return pd.DataFrame()
-                    
-                    query_time = time.time() - start_time_fetch
-                    progress_bar.progress(55, text=f"Query completed in {query_time:.1f}s, processing {rows_streamed:,} rows...")
-                    
-                    # Phase 6: Ultra-optimized DataFrame creation with columnar processing
-                    progress_bar.progress(60, text="Building DataFrame with columnar processing...")
-                    
-                    start_df_time = time.time()
-                    
-                    # OPTIMIZATION: Use columnar approach for DataFrame creation
-                    # This is dramatically faster than row-by-row processing
-                    column_names = schema
-                    n_rows = len(rows_list)
-                    
-                    # Pre-allocate memory for better performance
-                    col_dict = {col: [None] * n_rows for col in column_names}
-                    
-                    # Ultra-fast columnar data extraction
-                    for col_idx, col_name in enumerate(column_names):
-                        for row_idx, row in enumerate(rows_list):
-                            col_dict[col_name][row_idx] = row[col_idx]
-                    
-                    # OPTIMIZATION: Create DataFrame with pre-defined dtypes for better performance
-                    # This prevents type inference which is slow
-                    df = pd.DataFrame(col_dict)
-                    
-                    # Clean up memory explicitly to reduce peak memory usage
-                    del rows_list
-                    del col_dict
-                    
-                    df_time = time.time() - start_df_time
-                    record_count = len(df)
-                    progress_bar.progress(65, text=f"DataFrame built in {df_time:.1f}s ({record_count:,} records)")
-                    
-                except Exception as download_error:
-                    progress_bar.progress(100, text="Error downloading data")
-                    st.error(f"Error streaming query results: {str(download_error)}")
-                    return pd.DataFrame()
-                
-                # Phase 7: Ultra-optimized data processing with minimal passes
-                if 'ReceivedAt' in df.columns and len(df) > 0:
-                    # OPTIMIZATION: Use accelerated timestamp processing
-                    progress_bar.progress(70, text="Processing timestamps with vectorized operations...")
-                    
-                    timestamp_start = time.time()
-                    
-                    # ROBUST TIMESTAMP CONVERSION: Always ensure ReceivedAt is properly converted from INT64 Unix timestamp
-                    # First check if the column exists and has data
-                    if 'ReceivedAt' in df.columns and len(df) > 0:
-                        progress_bar.progress(70, text="Processing BigQuery INT64 timestamps...")
-                        
-                        # Check data type to determine conversion approach
-                        if pd.api.types.is_numeric_dtype(df['ReceivedAt']):
-                            # For numeric data (INT64 from BigQuery), apply enhanced detection logic
-                            timestamp_start = time.time()
-                            
-                            try:
-                                # Convert all values to float for reliable comparison
-                                sample_values = df['ReceivedAt'].head(50).astype(float).tolist()
-                                max_sample = max(sample_values) if sample_values else 0
-                                
-                                # Handle different timestamp formats based on digit length
-                                # Note: Some rows might have different formats, so we check the maximum value
-                                if max_sample > 1000000000000000:  # nanoseconds (16+ digits)
-                                    st.info("📊 Converting from nanoseconds INT64 timestamps")
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ns', errors='coerce')
-                                    progress_bar.progress(72, text=f"Converted {len(df):,} nanosecond timestamps from BigQuery")
-                                elif max_sample > 1000000000000:  # milliseconds (13 digits)
-                                    st.info("📊 Converting from milliseconds INT64 timestamps")
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ms', errors='coerce')
-                                    progress_bar.progress(72, text=f"Converted {len(df):,} millisecond timestamps from BigQuery")
-                                else:  # seconds (10 digits)
-                                    st.info("📊 Converting from seconds INT64 timestamps") 
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='s', errors='coerce')
-                                    progress_bar.progress(72, text=f"Converted {len(df):,} second timestamps from BigQuery")
-                                
-                                # Log conversion metrics
-                                timestamp_time = time.time() - timestamp_start
-                                progress_bar.progress(74, text=f"BigQuery INT64 timestamps processed in {timestamp_time:.2f}s")
-                            except Exception as ts_error:
-                                st.error(f"Error during timestamp conversion: {str(ts_error)}")
-                                # Fallback conversion attempt - try all common formats
-                                try:
-                                    st.warning("Attempting fallback timestamp conversion...")
-                                    # Try nanoseconds first
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ns', errors='coerce')
-                                    # If most are NaT, try milliseconds
-                                    if df['ReceivedAt'].isna().mean() > 0.5:
-                                        df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ms', errors='coerce')
-                                    # If still most are NaT, try seconds
-                                    if df['ReceivedAt'].isna().mean() > 0.5:
-                                        df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='s', errors='coerce')
-                                except:
-                                    st.error("Failed to convert timestamps even with fallback methods")
-                        elif pd.api.types.is_datetime64_any_dtype(df['ReceivedAt']):
-                            # Already datetime - no conversion needed
-                            progress_bar.progress(72, text=f"Using {len(df):,} native datetime values")
-                        else:
-                            # String timestamps - direct parallel conversion
-                            df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], errors='coerce')
-                            progress_bar.progress(72, text=f"Converted {len(df):,} string timestamps")
-                        
-                        # Validate conversion was successful by checking for NaT values
-                        nat_count = df['ReceivedAt'].isna().sum()
-                        if nat_count > 0:
-                            progress_bar.progress(75, text=f"Warning: Found {nat_count} invalid timestamps")
-                            if nat_count > len(df) * 0.1:  # More than 10% failed conversion
-                                st.warning(f"⚠️ High number of invalid timestamps: {nat_count:,} ({nat_count/len(df)*100:.1f}%)")
-                    else:
-                        progress_bar.progress(72, text="No ReceivedAt column found for timestamp conversion")
-                    
-                    # Handle invalid timestamps in one efficient operation
-                    invalid_count = df['ReceivedAt'].isna().sum()
-                    if invalid_count > 0:
-                        df = df[df['ReceivedAt'].notna()]
-                        if invalid_count > len(df) * 0.05:  # Only warn if significant
-                            st.warning(f"Removed {invalid_count:,} records with invalid timestamps")
-                    
-                    timestamp_time = time.time() - timestamp_start
-                    progress_bar.progress(75, text=f"Timestamps processed in {timestamp_time:.1f}s")
-                    
-                    # Phase 8: Ultra-optimized derived column creation
-                    progress_bar.progress(80, text="Creating derived columns with minimal passes...")
-                    
-                    # OPTIMIZATION: Pre-compute all derived columns in a single batch operation
-                    # This maximizes performance by avoiding multiple DataFrame passes
-                    derived_start = time.time()
-                    
-                    # Create datetime accessor columns once and reuse for all date operations
-                    date_accessor = df['ReceivedAt'].dt
-                    
-                    # OPTIMIZATION: Create all derived columns in one operation with assign
-                    df = df.assign(
-                        Date=date_accessor.date,
-                        Hour=date_accessor.hour,
-                        DayOfWeek=date_accessor.day_name(),
-                        Month=date_accessor.month_name(),
-                        Quarter=date_accessor.quarter,
-                        Time_Period=pd.cut(
-                            date_accessor.hour,
-                            bins=[0, 6, 11, 14, 17, 21, 24],
-                            labels=['Early Morning', 'Morning', 'Lunch', 'Afternoon', 'Evening', 'Night'],
-                            right=False
-                        )
-                    )
-                    
-                    # OPTIMIZATION: Process all numeric columns in batch with optimized dtypes
-                    numeric_cols = ['GrossPrice', 'Discount', 'VAT', 'Delivery', 'Tips', 'Surcharge', 'Total']
-                    
-                    # Convert all numeric columns with optimized method and appropriate dtype
-                    for col in numeric_cols:
-                        if col in df.columns:
-                            # Use float32 for memory efficiency while maintaining precision
-                            df[col] = pd.to_numeric(df[col], errors='coerce', downcast='float').fillna(0)
-                    
-                    # Phase 9: Ultra-optimized business calculations with minimal passes
-                    progress_bar.progress(85, text="Calculating business metrics with vectorized operations...")
-                    
-                    # OPTIMIZATION: Pre-compute common values used in multiple calculations
-                    gross_div_105 = df['GrossPrice'] / 1.05
-                    discount_div_105 = df['Discount'] / 1.05
-                    
-                    # Calculate net_sale with logic matching MySQL loader
-                    # New business logic: If Discount_Group is 'Total Discount (Staff Meals & Others)', use VAT-adjusted difference, else just GrossPrice/1.05
-                    if 'Discount_Group' in df.columns:
-                        df['net_sale'] = np.where(
-                            df['Discount_Group'] == 'Total Discount (Staff Meals & Others)',
-                            gross_div_105 - discount_div_105,
-                            df['GrossPrice'] / 1.05
-                        )
-                    else:
-                        df['net_sale'] = df['GrossPrice'] / 1.05
-                    
-                    # Ensure Discount_Percentage is always present
-                    df['Discount_Percentage'] = np.where(
-                        df['GrossPrice'] > 0,
-                        df['Discount'] / df['GrossPrice'] * 100,
-                        0
-                    )
-                    df['Discount_Percentage'] = df['Discount_Percentage'].fillna(0).replace([np.inf, -np.inf], 0)
-                    # OPTIMIZATION: Calculate all business metrics in one pass
-                    # Use numpy operations for maximum performance
-                    with np.errstate(divide='ignore', invalid='ignore'):
-                        df = df.assign(
-                            # Add revenue after delivery calculation
-                            Revenue_After_Delivery=df['net_sale'] - df['Delivery'],
-                            # Add profit margin approximation
-                            Profit_Margin=np.where(
-                                df['net_sale'] > 0,
-                                (df['net_sale'] * 0.3) / df['net_sale'] * 100,
-                                0
-                            ),
-                            # Order size categories
-                            Order_Size_Category=pd.cut(
-                                df['net_sale'],
-                                bins=[-float('inf'), 50, 100, 200, 500, float('inf')],
-                                labels=['Small', 'Medium', 'Large', 'X-Large', 'XX-Large']
-                            ),
-                            # Discount categories
-                            Discount_Category=pd.cut(
-                                df['Discount_Percentage'],
-                                bins=[-1, 0, 10, 25, 50, 100, float('inf')],
-                                labels=['None', 'Low', 'Medium', 'High', 'Very High', 'Full']
-                            )
-                        )
-                    
-                    # Replace any invalid values with zero in one operation
-                    replace_cols = ['Discount_Percentage', 'Profit_Margin']
-                    for col in replace_cols:
-                        df[col] = df[col].fillna(0).replace([np.inf, -np.inf], 0)
-                    
-                    # Clean up temporary variables
-                    del gross_div_105, discount_div_105
-                    
-                    # Sort by ReceivedAt for better display performance (replacing ORDER BY in SQL)
-                    df = df.sort_values('ReceivedAt', ascending=False)
-                    
-                    derived_time = time.time() - derived_start
-                    progress_bar.progress(95, text=f"Derived calculations completed in {derived_time:.1f}s")
-                    
-                    # Final phase: Completion and memory optimization
-                    total_time = time.time() - start_time
-                    
-                    # OPTIMIZATION: Implement memory reduction techniques
-                    df_memory_start = df.memory_usage(deep=True).sum() / (1024 * 1024)
-                    
-                    # Explicitly downcast memory usage
-                    # Create optimized copy with minimal memory footprint
-                    df = df.copy()
-                    
-                    # Optimize object columns that could be categorical
-                    categorical_candidates = ['Brand', 'Channel', 'Location', 'PaymentMethod', 'DayOfWeek', 
-                                             'Month', 'Quarter', 'Time_Period', 'Order_Size_Category', 'Discount_Category']
-                    for col in categorical_candidates:
-                        if col in df.columns and df[col].nunique() < 100:  # Only worth converting if low cardinality
-                            df[col] = df[col].astype('category')
-                    
-                    # Optimize Date column
-                    if 'Date' in df.columns:
-                        df['Date'] = pd.to_datetime(df['Date']).dt.date
-                    
-                    # NEW OPTIMIZATION: Implement automatic data caching based on size
-                    df_memory_end = df.memory_usage(deep=True).sum() / (1024 * 1024)
-                    memory_reduction = df_memory_start - df_memory_end
-                    
-                    # Report final statistics
-                    progress_bar.progress(100, text=f"✅ Loaded {len(df):,} records in {total_time:.1f}s ({df_memory_end:.1f} MB, saved {memory_reduction:.1f} MB)")
-                    st.success(f"✅ Successfully loaded {len(df):,} records in {total_time:.1f}s ({df_memory_end:.1f} MB)")
-                else:
-                    progress_bar.progress(100, text="No valid records found")
-                    st.warning("No records found or ReceivedAt column is missing")
-                    return pd.DataFrame()
-                    
-            except Exception as bq_error:
-                progress_bar.progress(100, text="Error processing query")
-                st.error(f"BigQuery processing error: {str(bq_error)}")
-                
-                # Try fallback approach with ultra-optimized implementation
-                st.warning("Attempting fallback query with simplified parameters...")
-                try:
-                    # OPTIMIZATION: Simpler fallback query with minimal parameters and explicit partition hint
-                    timestamp_cutoff = int((datetime.now() - timedelta(days=days_back)).timestamp())
-                    # If ReceivedAt is in nanoseconds, multiply cutoff by 1_000_000_000
-                    timestamp_cutoff *= 1_000_000_000
-                    fallback_query = f"""
-                    SELECT OrderID, CustomerName, ReceivedAt, GrossPrice, Discount, 
-                           Delivery, Tips, VAT, Surcharge, Total, 
-                           Channel, Brand, Location, PaymentMethod
-                    FROM `my-database-order-level-2025.order_level.sales_data`
-                    /* Simple direct comparison for INT64 timestamp field */
-                    WHERE ReceivedAt >= {timestamp_cutoff}
-                    /* Limit to smaller sample for reliability */
-                    LIMIT 50000
-                    """
-                    
-                    # OPTIMIZATION: Configure an even more optimized fallback job
-                    fallback_job_config = bigquery.QueryJobConfig(
-                        use_query_cache=True,
-                        priority=bigquery.QueryPriority.INTERACTIVE,
-                        maximum_bytes_billed=10000000000,  # Lower limit for fallback
-                        labels={"dashboard": "sales", "function": "fallback_query", "version": "ultra_optimized"}
-                    )
-                    
-                    # Note: Streaming mode hint not supported in this version
-                    
-                    # Run the optimized fallback query with extended timeout
-                    fallback_job = client.query(fallback_query, job_config=fallback_job_config, timeout=120)
-                    
-                    # OPTIMIZATION: Use columnar result extraction with progress monitoring
-                    rows = list(fallback_job.result())
-                    
-                    if not rows:
-                        return pd.DataFrame()
-                    
-                    # Get column names
-                    column_names = [field.name for field in fallback_job.result().schema]
-                    
-                    # Pre-allocate memory for better performance
-                    n_rows = len(rows)
-                    col_dict = {col: [None] * n_rows for col in column_names}
-                    
-                    # Ultra-fast columnar data extraction
-                    for col_idx, col_name in enumerate(column_names):
-                        for row_idx, row in enumerate(rows):
-                            col_dict[col_name][row_idx] = row[col_idx]
-                    
-                    # Create DataFrame from pre-populated dict - much faster than row-by-row
-                    df = pd.DataFrame(col_dict)
-                    
-                    # Clean up memory
-                    del rows
-                    del col_dict
-                    
-                    # ENHANCED FALLBACK: Process timestamps with robust conversion method
-                    if 'ReceivedAt' in df.columns:
-                        st.info("Processing ReceivedAt timestamps from fallback query...")
-                        try:
-                            # Sample more values for more reliable format detection in fallback case
-                            if pd.api.types.is_numeric_dtype(df['ReceivedAt']):
-                                # Convert all sample values to float for reliable comparison
-                                sample_values = df['ReceivedAt'].head(50).astype(float).tolist()
-                                max_sample = max(sample_values) if sample_values else 0
-
-                                # ROBUST DETECTION: Enhanced timestamp format detection for BigQuery INT64
-                                if max_sample > 1000000000000000:  # nanoseconds (16+ digits)
-                                    st.info("Converting BigQuery nanosecond INT64 timestamps")
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ns', errors='coerce')
-                                elif max_sample > 1000000000000:  # milliseconds (13 digits)
-                                    st.info("Converting BigQuery millisecond INT64 timestamps")
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ms', errors='coerce')
-                                else:  # seconds (10 digits)
-                                    st.info("Converting BigQuery second INT64 timestamps")
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='s', errors='coerce')
-                            else:
-                                # Try standard conversion for other formats
-                                df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], errors='coerce')
-                            
-                            # Remove invalid timestamps with detailed feedback
-                            invalid_count = df['ReceivedAt'].isna().sum()
-                            if invalid_count > 0:
-                                st.warning(f"⚠️ Removed {invalid_count} records with invalid timestamps in fallback query")
-                                df = df[df['ReceivedAt'].notna()]
-                            
-                            # Verify conversion worked
-                            if not pd.api.types.is_datetime64_any_dtype(df['ReceivedAt']):
-                                st.error("❌ Failed to convert ReceivedAt to datetime in fallback query")
-                            else:
-                                st.success(f"✅ Successfully converted {len(df)} ReceivedAt values to datetime")
-                        except Exception as ts_fallback_error:
-                            st.error(f"Error during timestamp conversion in fallback query: {str(ts_fallback_error)}")
-                            # Last resort attempt - try all common formats
-                            try:
-                                # Try nanoseconds first
-                                df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ns', errors='coerce')
-                                # If most are NaT, try milliseconds
-                                if df['ReceivedAt'].isna().mean() > 0.5:
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='ms', errors='coerce')
-                                # If still most are NaT, try seconds
-                                if df['ReceivedAt'].isna().mean() > 0.5:
-                                    df['ReceivedAt'] = pd.to_datetime(df['ReceivedAt'], unit='s', errors='coerce')
-                            except:
-                                st.error("All timestamp conversion methods failed")
-                        
-                        # Create datetime accessor once if we have valid timestamps
-                        if pd.api.types.is_datetime64_any_dtype(df['ReceivedAt']):
-                            date_accessor = df['ReceivedAt'].dt
-                            
-                            # OPTIMIZATION: Create all derived columns in a single operation
-                            df = df.assign(
-                                Date=date_accessor.date,
-                                Hour=date_accessor.hour,
-                                DayOfWeek=date_accessor.day_name(),
-                                Month=date_accessor.month_name(),
-                                Quarter=date_accessor.quarter
-                            )
-                    
-                    # Process numeric columns with optimized vectorized operations
-                    numeric_cols = ['GrossPrice', 'Discount', 'VAT', 'Delivery', 'Tips', 'Surcharge', 'Total']
-                    for col in numeric_cols:
-                        if col in df.columns:
-                            df[col] = pd.to_numeric(df[col], errors='coerce', downcast='float').fillna(0)
-                    
-                    # Calculate derived columns with optimized vectorized operations
-                    # New business logic: If Discount_Group is 'Total Discount (Staff Meals & Others)', use VAT-adjusted difference, else just GrossPrice/1.05
-                    if 'Discount_Group' in df.columns:
-                        df['net_sale'] = np.where(
-                            df['Discount_Group'] == 'Total Discount (Staff Meals & Others)',
-                            (df['GrossPrice'] / 1.05) - (df['Discount'] / 1.05),
-                            df['GrossPrice'] / 1.05
-                        )
-                    else:
-                        df['net_sale'] = df['GrossPrice'] / 1.05
-                    
-                    with np.errstate(divide='ignore', invalid='ignore'):
-                        df['Discount_Percentage'] = np.where(
-                            df['GrossPrice'] > 0, 
-                            df['Discount'] / df['GrossPrice'] * 100,
-                            0
-                        )
-                    
-                    df['Discount_Percentage'] = df['Discount_Percentage'].fillna(0).replace([np.inf, -np.inf], 0)
-                    
-                    # Optimize memory usage
-                    for col in ['Brand', 'Channel', 'Location', 'PaymentMethod', 'DayOfWeek', 'Month', 'Quarter']:
-                        if col in df.columns and df[col].nunique() < 100:
-                            df[col] = df[col].astype('category')
-                    
-                    # Sort by ReceivedAt for better display performance
-                    df = df.sort_values('ReceivedAt', ascending=False)
-                    
-                    memory_usage_mb = df.memory_usage(deep=True).sum() / (1024 * 1024)
-                    st.success(f"✅ Loaded {len(df):,} records with fallback approach ({memory_usage_mb:.1f} MB)")
-                    
-                except Exception as fallback_error:
-                    st.error(f"Fallback query also failed: {str(fallback_error)}")
-                    return pd.DataFrame()
-        
-        # Return the fully optimized DataFrame
-        return df
-    except Exception as e:
-        st.error(f"Error loading data from BigQuery: {e}")
-        return pd.DataFrame()
+def load_data_from_aws(days_back=7):
+    """AWS data source placeholder - functionality coming soon"""
+    st.warning("⚠️ AWS data source is not yet implemented. This feature is coming soon!")
+    st.info("💡 For now, please use MySQL as your data source.")
+    return pd.DataFrame()
 
 def calculate_metrics(df):
     """Calculate key performance metrics"""
@@ -2556,31 +2012,38 @@ def create_pivot_table_analysis(df):
         except Exception as e:
             st.error(f"❌ Error creating pivot table: {str(e)}")
             st.write("Please try a different combination of dimensions and values.")
-        # --- Debug Tab: Compare MySQL vs BigQuery Data ---
+        # --- Debug Tab: Compare MySQL vs AWS Data ---
         # Ensure 'today' is defined for debug scope
         today_debug = pd.Timestamp.now().date()
-        with st.expander('🛠️ Debug: Compare MySQL vs BigQuery Data (for selected date range)'):
-            st.write('This section helps diagnose data mismatches between MySQL and BigQuery.')
+        with st.expander('🛠️ Debug: Data Source Comparison (for selected date range)'):
+            st.write('This section helps diagnose data issues and compare data sources.')
             # Calculate days_back for debug (same as sidebar logic)
             debug_days_back = (today_debug - start_date).days + 1
             df_mysql = load_data_from_mysql(debug_days_back)
-            df_bq = load_data_from_bigquery(debug_days_back)
-            st.write(f"MySQL: {len(df_mysql):,} rows, BigQuery: {len(df_bq):,} rows")
+            df_aws = load_data_from_aws(debug_days_back)
+            st.write(f"MySQL: {len(df_mysql):,} rows, AWS: {len(df_aws):,} rows")
             if not df_mysql.empty:
                 st.write('MySQL min/max ReceivedAt:', str(df_mysql['ReceivedAt'].min()), str(df_mysql['ReceivedAt'].max()))
-            if not df_bq.empty:
-                st.write('BigQuery min/max ReceivedAt:', str(df_bq['ReceivedAt'].min()), str(df_bq['ReceivedAt'].max()))
+            if not df_aws.empty:
+                st.write('AWS min/max ReceivedAt:', str(df_aws['ReceivedAt'].min()), str(df_aws['ReceivedAt'].max()))
             # Show sample rows for the same day
-            if not df_mysql.empty and not df_bq.empty:
+            if not df_mysql.empty:
                 sample_date = df_mysql['ReceivedAt'].dt.date.min()
                 st.write(f"Sample date: {sample_date}")
                 st.write('MySQL sample:')
                 st.dataframe(df_mysql[df_mysql['ReceivedAt'].dt.date == sample_date][['OrderID','GrossPrice','Discount','ReceivedAt']].head(10))
-                st.write('BigQuery sample:')
-                st.dataframe(df_bq[df_bq['ReceivedAt'].dt.date == sample_date][['OrderID','GrossPrice','Discount','ReceivedAt']].head(10))
+            if not df_aws.empty:
+                st.write('AWS sample:')
+                st.dataframe(df_aws[df_aws['ReceivedAt'].dt.date == sample_date][['OrderID','GrossPrice','Discount','ReceivedAt']].head(10))
+            else:
+                st.write('AWS: No data available (feature coming soon)')
             # Check for nulls in key columns
-            st.write('MySQL nulls:', df_mysql[['GrossPrice','Discount','ReceivedAt']].isnull().sum())
-            st.write('BigQuery nulls:', df_bq[['GrossPrice','Discount','ReceivedAt']].isnull().sum())
+            if not df_mysql.empty:
+                st.write('MySQL nulls:', df_mysql[['GrossPrice','Discount','ReceivedAt']].isnull().sum())
+            if not df_aws.empty:
+                st.write('AWS nulls:', df_aws[['GrossPrice','Discount','ReceivedAt']].isnull().sum())
+            else:
+                st.write('AWS: No data to check (feature coming soon)')
 
 # Utility function to suppress WebSocket errors
 def suppress_websocket_errors():
@@ -2611,9 +2074,19 @@ def main():
     # Sidebar controls
     with st.sidebar:
         st.subheader("Data Source Settings")
-        # Force MySQL as the only data source
-        data_source = "MySQL"
-        st.info("Using MySQL as the only data source.")
+        
+        # Data source selection
+        data_source = st.selectbox(
+            "Choose Data Source",
+            options=["MySQL", "AWS (Coming Soon)"],
+            index=0,
+            help="Select your data source. AWS integration is coming soon!"
+        )
+        
+        if data_source == "AWS (Coming Soon)":
+            st.info("🚧 AWS integration is in development and will be available soon!")
+        else:
+            st.info("✅ Using MySQL as data source")
 
         # Date range filter
         st.subheader("Date Range Filter")
@@ -2648,7 +2121,7 @@ def main():
         if not brand_options:
             st.caption("No brand data available.")
 
-        # Calculate days_back for backward compatibility (for MySQL/BigQuery loaders)
+        # Calculate days_back for backward compatibility (for MySQL/AWS loaders)
         days_back = (today - start_date).days + 1
         refresh_button = st.button("Refresh Data")
 
@@ -2662,7 +2135,7 @@ def main():
                 st.progress(0.75, "Processing data")
 
         # Show data source tips for better performance
-        st.info("💡 **Tips**: BigQuery is faster for large datasets. Use fewer days for quicker loading.")
+        st.info("💡 **Tips**: Use fewer days for quicker loading. AWS integration coming soon!")
     
     # Session state to track if data has been loaded
     if 'data_loaded' not in st.session_state:
@@ -2680,8 +2153,11 @@ def main():
             with st.spinner(loading_message):
                 if data_source == "MySQL":
                     df = load_data_from_mysql(days_back)
+                elif data_source == "AWS (Coming Soon)":
+                    df = load_data_from_aws(days_back)
                 else:
-                    df = load_data_from_bigquery(days_back)
+                    # Default to MySQL for any other case
+                    df = load_data_from_mysql(days_back)
                 
                 if not df.empty:
                     # Apply additional calculated columns only after successful load
@@ -2693,7 +2169,10 @@ def main():
                     st.session_state.data_loaded = True
                     st.success(f"✅ Loaded {len(df):,} records from {data_source}.")
                 else:
-                    st.warning(f"⚠️ No data loaded from {data_source}. Please check your connection settings.")
+                    if data_source == "AWS (Coming Soon)":
+                        st.info("ℹ️ AWS data source is not yet available. Please select MySQL to view data.")
+                    else:
+                        st.warning(f"⚠️ No data loaded from {data_source}. Please check your connection settings.")
             
             # Reset loading state
             st.session_state.loading_state = "ready"
