@@ -3,7 +3,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from google.cloud import bigquery
 import mysql.connector
 import numpy as np
 from datetime import datetime, timedelta
