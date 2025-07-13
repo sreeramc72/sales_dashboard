@@ -1,6 +1,0 @@
-streamlit
-pandas
-plotly
-scikit-learn
-mysql-connector-python
-# Add any other packages you use in your code
