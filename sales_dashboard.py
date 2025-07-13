@@ -1553,7 +1553,7 @@ def create_pivot_table_analysis(df):
                         styled_df = styled_df.applymap(style_differences, subset=[col])
             
             # Display with custom styling
-            st.dataframe(styled_df, use_container_width=True)
+            st.dataframe(sanitize_for_streamlit(styled_df), use_container_width=True)
             
             # Download option for Combined Table
             if sync_info and selected_max_hour is not None:
@@ -1782,7 +1782,7 @@ def create_pivot_table_analysis(df):
                                         else:
                                             styled_top = styled_top.applymap(style_differences, subset=[col])
                                     
-                                    st.dataframe(styled_top, use_container_width=True)
+                                    st.dataframe(sanitize_for_streamlit(styled_top), use_container_width=True)
                                 else:
                                     st.dataframe(sanitize_for_streamlit(display_top), use_container_width=True)
                             
@@ -1815,7 +1815,7 @@ def create_pivot_table_analysis(df):
                                         else:
                                             styled_bottom = styled_bottom.applymap(style_differences, subset=[col])
                                     
-                                    st.dataframe(styled_bottom, use_container_width=True)
+                                    st.dataframe(sanitize_for_streamlit(styled_bottom), use_container_width=True)
                                 else:
                                     st.dataframe(sanitize_for_streamlit(display_bottom), use_container_width=True)
                             
@@ -2037,7 +2037,7 @@ def create_pivot_table_analysis(df):
                                     styled_decline = styled_decline.applymap(style_differences, subset=['Net Sales Change'])
                                     styled_decline = styled_decline.applymap(style_discount_differences, subset=['Discount Change', 'Discount % Change'])
                                     
-                                    st.dataframe(styled_decline, use_container_width=True)
+                                    st.dataframe(sanitize_for_streamlit(styled_decline), use_container_width=True)
                                     
                                     # Download option
                                     csv_declines = decline_display.to_csv(index=False)
@@ -2092,7 +2092,7 @@ def create_pivot_table_analysis(df):
                                     styled_improvement = styled_improvement.applymap(style_differences, subset=['Net Sales Change'])
                                     styled_improvement = styled_improvement.applymap(style_discount_differences, subset=['Discount Change', 'Discount % Change'])
                                     
-                                    st.dataframe(styled_improvement, use_container_width=True)
+                                    st.dataframe(sanitize_for_streamlit(styled_improvement), use_container_width=True)
                                     
                                     # Download option
                                     csv_improvements = improvement_display.to_csv(index=False)
@@ -2147,7 +2147,7 @@ def create_pivot_table_analysis(df):
                                 styled_all = styled_all.applymap(style_differences, subset=['Net Sales Change'])
                                 styled_all = styled_all.applymap(style_discount_differences, subset=['Discount Change', 'Discount % Change'])
                                 
-                                st.dataframe(styled_all, use_container_width=True)
+                                st.dataframe(sanitize_for_streamlit(styled_all), use_container_width=True)
                                 
                                 # Download option
                                 csv_all_changes = all_display.to_csv(index=False)
@@ -2784,13 +2784,13 @@ def main():
                 st.markdown("### 🟢 Locations Performing Well with Discount Campaigns")
                 good_df = loc_brand[good_mask].sort_values('Profit', ascending=False).head(10)
                 if not good_df.empty:
-                    st.dataframe(good_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index(), use_container_width=True)
+                    st.dataframe(sanitize_for_streamlit(good_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index()), use_container_width=True)
                 else:
                     st.info("No locations found with strong positive performance on discounts.")
                 st.markdown("### 🔴 Locations Where Discounts Are Negatively Impacting Sales")
                 bad_df = loc_brand[bad_mask].sort_values('Profit').head(10)
                 if not bad_df.empty:
-                    st.dataframe(bad_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index(), use_container_width=True)
+                    st.dataframe(sanitize_for_streamlit(bad_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index()), use_container_width=True)
                 else:
                     st.info("No locations found with negative impact from discounts.")
             # Discount Performance Tab
