@@ -185,4 +185,4 @@ if __name__ == "__main__":
                     os.remove(file_path)
                     print(f"🗑️ Deleted local file: {file_path}")
                 except Exception as e:
-                    print(f"⚠️ Could not delete 
+                    print(f"⚠️ Could not delete file: {e}")

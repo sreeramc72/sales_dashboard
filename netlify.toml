@@ -1,0 +1,17 @@
+[build]
+  command = "pip install -r requirements.txt"
+  publish = "."
+
+[build.environment]
+  PYTHON_VERSION = "3.10"
+
+[[redirects]]
+  from = "/*"
+  to = "/.netlify/functions/streamlit"
+  status = 200
+
+[functions]
+  directory = "functions"
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
