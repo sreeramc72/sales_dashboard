@@ -420,15 +420,30 @@ def load_data_from_mysql(days_back=7, max_retries=3):
             # Show loading indicator with retry information if applicable
             retry_msg = f" (Attempt {retry_count + 1}/{max_retries})" if retry_count > 0 else ""
             with st.spinner(f"🔄 Loading data from MySQL for last {days_back} days{retry_msg}..."):
+                # Get AWS MySQL credentials from Streamlit secrets
+                try:
+                    aws_host = st.secrets["MYSQL_HOST"]
+                    aws_db = st.secrets["MYSQL_DB"]
+                    aws_user = st.secrets["MYSQL_USER"]
+                    aws_pass = st.secrets["MYSQL_PASSWORD"]
+                    aws_port = int(st.secrets["MYSQL_PORT"])
+                except KeyError:
+                    # Fallback to environment variables
+                    aws_host = os.getenv("MYSQL_HOST")
+                    aws_db = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
+                    aws_user = os.getenv("MYSQL_USER")
+                    aws_pass = os.getenv("MYSQL_PASSWORD")
+                    aws_port = int(os.getenv("MYSQL_PORT", 3306))
+                
                 # Log connection attempt (not exposing credentials)
-                st.info(f"Connecting to MySQL database at {os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}")
-                # Create connection with timeout
+                st.info(f"Connecting to AWS MySQL database at {aws_host}:{aws_port}")
+                # Create connection with timeout using AWS MySQL credentials
                 conn = mysql.connector.connect(
-                    host=os.getenv("MYSQL_HOST"),
-                    port=int(os.getenv("MYSQL_PORT", 3306)),
-                    user=os.getenv("MYSQL_USER"),
-                    password=os.getenv("MYSQL_PASSWORD"),
-                    database=os.getenv("MYSQL_DATABASE"),
+                    host=aws_host,
+                    port=aws_port,
+                    user=aws_user,
+                    password=aws_pass,
+                    database=aws_db,
                     connection_timeout=connection_timeout
                 )
                 # Optimized query: Select only required columns, use WHERE clause first
