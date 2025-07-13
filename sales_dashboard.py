@@ -457,7 +457,15 @@ def load_data_from_mysql(days_back=7, max_retries=3):
                 """
                 # Load data in chunks if it's large
                 st.info(f"Running query to fetch {days_back} days of sales data...")
+                st.code(f"Query: SELECT ... FROM sales_data WHERE ReceivedAt >= DATE_SUB(NOW(), INTERVAL {days_back} DAY)")
                 df = pd.read_sql(query, conn, parse_dates=['ReceivedAt'])
+                
+                # Debug information
+                if not df.empty:
+                    date_range_info = f"Data range: {df['ReceivedAt'].min()} to {df['ReceivedAt'].max()}"
+                    st.info(date_range_info)
+                else:
+                    st.warning("No data returned from query - checking if table exists and has data")
                 conn.close()
                 # Log successful connection
                 st.success(f"Successfully connected to MySQL and retrieved {len(df)} records!")
@@ -2504,15 +2512,15 @@ def main():
         st.success("🔗 Connected to AWS MySQL Database")
         st.caption(f"Host: {db_host}")
 
-        # Date range filter (Default: Month-To-Date)
+        # Date range filter (Default: Last 30 days)
         st.subheader("Date Range Filter")
         today = datetime.now().date()
-        default_start = today.replace(day=1)  # Start of current month
+        default_start = today - timedelta(days=30)  # Last 30 days
         default_end = today
         date_range = st.date_input(
             "Select date range",
             value=(default_start, default_end),
-            min_value=today - timedelta(days=60),
+            min_value=today - timedelta(days=90),
             max_value=today
         )
         # Ensure date_range is always a tuple (start, end)
@@ -2538,7 +2546,8 @@ def main():
             st.caption("No brand data available.")
 
         # Calculate days_back for backward compatibility (for MySQL/BigQuery loaders)
-        days_back = (today - start_date).days + 1
+        days_back = max((today - start_date).days + 1, 30)  # Ensure minimum 30 days
+        st.info(f"📊 Fetching {days_back} days of data from database")
         refresh_button = st.button("Refresh Data")
 
         # Add a progress indicator in sidebar
