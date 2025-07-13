@@ -112,9 +112,12 @@ from deep_dive_discount_performance_insights import deep_dive_discount_performan
 # --- Utility: Sanitize DataFrame for Streamlit Arrow compatibility ---
 def sanitize_for_streamlit(df):
     """Convert all object columns to string for Streamlit Arrow compatibility."""
+    import numpy as np
     for col in df.columns:
         if df[col].dtype == 'O':
-            df[col] = df[col].apply(lambda x: str(x) if not (isinstance(x, (int, float, bool, type(None), pd.Timestamp))) else x)
+            df[col] = df[col].apply(
+                lambda x: str(x) if not isinstance(x, (int, float, bool, type(None), pd.Timestamp, np.generic)) else x
+            )
             if df[col].dtype == 'O':
                 df[col] = df[col].astype(str)
     return df
