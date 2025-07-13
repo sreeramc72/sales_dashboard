@@ -107,17 +107,21 @@ def get_aws_mysql_engine(endpoint, db_name, username, password, port=3306):
     # BigQuery loader and debug UI removed as per user request
 from deep_dive_discount_performance_insights import deep_dive_discount_performance_insights
 
+# Advanced analytics import
+try:
+    from advanced_analytics import display_clv_analysis, display_churn_prediction, display_rfm_analysis
+    ADVANCED_ANALYTICS_AVAILABLE = True
+except ImportError:
+    ADVANCED_ANALYTICS_AVAILABLE = False
+
 # --- Standard library imports ---
 
 # --- Utility: Sanitize DataFrame for Streamlit Arrow compatibility ---
 def sanitize_for_streamlit(df):
     """Convert all object columns to string for Streamlit Arrow compatibility."""
-    import numpy as np
     for col in df.columns:
         if df[col].dtype == 'O':
-            df[col] = df[col].apply(
-                lambda x: str(x) if not isinstance(x, (int, float, bool, type(None), pd.Timestamp, np.generic)) else x
-            )
+            df[col] = df[col].apply(lambda x: str(x) if not (isinstance(x, (int, float, bool, type(None), pd.Timestamp))) else x)
             if df[col].dtype == 'O':
                 df[col] = df[col].astype(str)
     return df
@@ -1556,7 +1560,7 @@ def create_pivot_table_analysis(df):
                         styled_df = styled_df.applymap(style_differences, subset=[col])
             
             # Display with custom styling
-            st.dataframe(sanitize_for_streamlit(styled_df), use_container_width=True)
+            st.dataframe(styled_df, use_container_width=True)
             
             # Download option for Combined Table
             if sync_info and selected_max_hour is not None:
@@ -1785,7 +1789,7 @@ def create_pivot_table_analysis(df):
                                         else:
                                             styled_top = styled_top.applymap(style_differences, subset=[col])
                                     
-                                    st.dataframe(sanitize_for_streamlit(styled_top), use_container_width=True)
+                                    st.dataframe(styled_top, use_container_width=True)
                                 else:
                                     st.dataframe(sanitize_for_streamlit(display_top), use_container_width=True)
                             
@@ -1818,7 +1822,7 @@ def create_pivot_table_analysis(df):
                                         else:
                                             styled_bottom = styled_bottom.applymap(style_differences, subset=[col])
                                     
-                                    st.dataframe(sanitize_for_streamlit(styled_bottom), use_container_width=True)
+                                    st.dataframe(styled_bottom, use_container_width=True)
                                 else:
                                     st.dataframe(sanitize_for_streamlit(display_bottom), use_container_width=True)
                             
@@ -2040,7 +2044,7 @@ def create_pivot_table_analysis(df):
                                     styled_decline = styled_decline.applymap(style_differences, subset=['Net Sales Change'])
                                     styled_decline = styled_decline.applymap(style_discount_differences, subset=['Discount Change', 'Discount % Change'])
                                     
-                                    st.dataframe(sanitize_for_streamlit(styled_decline), use_container_width=True)
+                                    st.dataframe(styled_decline, use_container_width=True)
                                     
                                     # Download option
                                     csv_declines = decline_display.to_csv(index=False)
@@ -2095,7 +2099,7 @@ def create_pivot_table_analysis(df):
                                     styled_improvement = styled_improvement.applymap(style_differences, subset=['Net Sales Change'])
                                     styled_improvement = styled_improvement.applymap(style_discount_differences, subset=['Discount Change', 'Discount % Change'])
                                     
-                                    st.dataframe(sanitize_for_streamlit(styled_improvement), use_container_width=True)
+                                    st.dataframe(styled_improvement, use_container_width=True)
                                     
                                     # Download option
                                     csv_improvements = improvement_display.to_csv(index=False)
@@ -2150,7 +2154,7 @@ def create_pivot_table_analysis(df):
                                 styled_all = styled_all.applymap(style_differences, subset=['Net Sales Change'])
                                 styled_all = styled_all.applymap(style_discount_differences, subset=['Discount Change', 'Discount % Change'])
                                 
-                                st.dataframe(sanitize_for_streamlit(styled_all), use_container_width=True)
+                                st.dataframe(styled_all, use_container_width=True)
                                 
                                 # Download option
                                 csv_all_changes = all_display.to_csv(index=False)
@@ -2611,7 +2615,10 @@ def main():
             "🎮 Shady's Command Center",
             "📅 Period Comparison",
             "📋 Data Overview",
-            "🧹 Data Quality"
+            "🧹 Data Quality",
+            "💰 Customer Lifetime Value",
+            "🚨 Churn Prediction",
+            "📊 RFM Analysis"
         ])
         # 5. Sandbox Tab (User-Friendly & Interactive)
         with tabs[4]:
@@ -2787,13 +2794,13 @@ def main():
                 st.markdown("### 🟢 Locations Performing Well with Discount Campaigns")
                 good_df = loc_brand[good_mask].sort_values('Profit', ascending=False).head(10)
                 if not good_df.empty:
-                    st.dataframe(sanitize_for_streamlit(good_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index()), use_container_width=True)
+                    st.dataframe(good_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index(), use_container_width=True)
                 else:
                     st.info("No locations found with strong positive performance on discounts.")
                 st.markdown("### 🔴 Locations Where Discounts Are Negatively Impacting Sales")
                 bad_df = loc_brand[bad_mask].sort_values('Profit').head(10)
                 if not bad_df.empty:
-                    st.dataframe(sanitize_for_streamlit(bad_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index()), use_container_width=True)
+                    st.dataframe(bad_df[['Total_Orders','Total_Sales','Total_Discount','Discount_Rate_%','Profit']].reset_index(), use_container_width=True)
                 else:
                     st.info("No locations found with negative impact from discounts.")
             # Discount Performance Tab
@@ -3049,6 +3056,27 @@ def main():
                 st.info("No ReceivedAt column in data.")
             st.write("### Data Preview")
             st.dataframe(filtered_df.head(20), use_container_width=True)
+
+        # 10. Customer Lifetime Value Tab
+        with tabs[10]:
+            if ADVANCED_ANALYTICS_AVAILABLE:
+                display_clv_analysis(filtered_df)
+            else:
+                st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
+
+        # 11. Churn Prediction Tab  
+        with tabs[11]:
+            if ADVANCED_ANALYTICS_AVAILABLE:
+                display_churn_prediction(filtered_df)
+            else:
+                st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
+
+        # 12. RFM Analysis Tab
+        with tabs[12]:
+            if ADVANCED_ANALYTICS_AVAILABLE:
+                display_rfm_analysis(filtered_df)
+            else:
+                st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
 
 if __name__ == "__main__":
     try:
