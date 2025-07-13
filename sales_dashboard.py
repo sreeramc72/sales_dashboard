@@ -42,35 +42,24 @@ def get_aws_mysql_engine(endpoint, db_name, username, password, port=3306):
 
 # ...existing code...
 
-# --- Data Source Selection ---
-
-# Add a button to test AWS MySQL connection using .env credentials
-if st.sidebar.button("Test AWS MySQL Connection (.env)"):
-    test_aws_mysql_connection()
-
-st.sidebar.header("Data Source Selection")
-data_source = st.sidebar.selectbox(
-    "Choose Data Source:",
-    ["Local MySQL", "AWS MySQL"],
-    index=1  # AWS MySQL is default
-)
-
-if data_source == "Local MySQL":
-    st.sidebar.success("Using Local MySQL (from .env)")
-    db_host = os.getenv("MYSQL_HOST")
-    db_name = os.getenv("MYSQL_DATABASE")
-    db_user = os.getenv("MYSQL_USER")
-    db_pass = os.getenv("MYSQL_PASSWORD")
-    db_port = int(os.getenv("MYSQL_PORT") or 3306)
-else:
-    st.sidebar.success("Using AWS MySQL (from st.secrets)")
+# --- AWS MySQL Default Configuration ---
+# Automatically use AWS MySQL from Streamlit secrets
+try:
+    # Use AWS MySQL credentials from Streamlit secrets by default
     db_host = st.secrets["MYSQL_HOST"]
     db_name = st.secrets["MYSQL_DB"]
     db_user = st.secrets["MYSQL_USER"]
     db_pass = st.secrets["MYSQL_PASSWORD"]
     db_port = int(st.secrets["MYSQL_PORT"])
+except KeyError:
+    # Fallback to environment variables if secrets not available
+    db_host = os.getenv("MYSQL_HOST")
+    db_name = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
+    db_user = os.getenv("MYSQL_USER")
+    db_pass = os.getenv("MYSQL_PASSWORD")
+    db_port = int(os.getenv("MYSQL_PORT") or 3306)
 
-# Create a single engine for all database operations
+# Create AWS MySQL engine for all database operations
 engine = get_aws_mysql_engine(
     endpoint=db_host,
     db_name=db_name,
@@ -78,7 +67,6 @@ engine = get_aws_mysql_engine(
     password=db_pass,
     port=db_port
 )
-# Use 'engine' for all database operations below
 import sqlalchemy
 import pandas as pd
 from sqlalchemy.engine import URL
@@ -2498,8 +2486,8 @@ def main():
     # Sidebar controls
     with st.sidebar:
         st.subheader("Data Source Settings")
-        data_source = "MySQL"  # Default data source (MySQL only)
-        st.info(f"Using {data_source} as the data source.")
+        st.success("🔗 Connected to AWS MySQL Database")
+        st.caption(f"Host: {db_host}")
 
         # Date range filter (Default: Month-To-Date)
         st.subheader("Date Range Filter")
@@ -2561,18 +2549,18 @@ def main():
             # Set loading state
             st.session_state.loading_state = "loading"
             # Load data with optimized parameters
-            loading_message = f"Loading optimized data for the last {days_back} days from {data_source}..."
+            loading_message = f"Loading optimized data for the last {days_back} days from AWS MySQL..."
             with st.spinner(loading_message):
-                # Load data from MySQL database
+                # Load data from AWS MySQL database
                 df = load_data_from_mysql(days_back)
                 if not df.empty:
                     df = add_essential_calculated_columns(df)
                     st.session_state.df = df
                     st.session_state.data_loaded = True
                     st.session_state.data_load_time = datetime.now()
-                    st.success(f"✅ Loaded {len(df):,} records from {data_source}.")
+                    st.success(f"✅ Loaded {len(df):,} records from AWS MySQL Database.")
                 else:
-                    st.warning(f"⚠️ No data loaded from {data_source}. Please check your connection settings.")
+                    st.warning(f"⚠️ No data loaded from AWS MySQL. Please check your connection settings.")
             st.session_state.loading_state = "ready"
         except Exception as e:
             st.session_state.loading_state = "ready"
