@@ -21,6 +21,8 @@ def test_aws_mysql_connection():
 
 import os
 import streamlit as st
+from datetime import datetime, timezone, timedelta
+import pytz
 
 # --- Third-party imports (for AWS MySQL helper) ---
 from sqlalchemy import create_engine, text
@@ -550,12 +552,24 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
                     database=aws_db,
                     connection_timeout=connection_timeout
                 )
-                # Optimized query: Select only required columns, use specific date range
-                from datetime import datetime
+                # Optimized query: Select only required columns, use specific date range with timezone handling
+                # Check MySQL timezone and use appropriate time reference
+                cursor = conn.cursor()
+                cursor.execute("SELECT @@session.time_zone, NOW()")
+                mysql_tz, mysql_now = cursor.fetchone()
+                cursor.close()
+                
+                # Use MySQL server time as reference to avoid timezone mismatches
+                # This ensures we're always in sync with the database's timezone
                 start_date_str = datetime.combine(datetime.strptime(str(start_date), '%Y-%m-%d').date(), datetime.min.time()).strftime('%Y-%m-%d %H:%M:%S')
-                # For end date, if it's today, use current time; otherwise use end of day
-                if str(end_date) == str(datetime.now().date()):
-                    end_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                
+                # For end date, if it's today, use MySQL server's current time; otherwise use end of day
+                today_check = datetime.strptime(str(end_date), '%Y-%m-%d').date()
+                mysql_today = mysql_now.date() if mysql_now else datetime.now().date()
+                
+                if today_check == mysql_today:
+                    # Use MySQL server's current time to capture all data up to now
+                    end_date_str = mysql_now.strftime('%Y-%m-%d %H:%M:%S') if mysql_now else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 else:
                     end_date_str = datetime.combine(datetime.strptime(str(end_date), '%Y-%m-%d').date(), datetime.max.time()).strftime('%Y-%m-%d %H:%M:%S')
                 
@@ -581,6 +595,8 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
                     earliest_in_data = df['ReceivedAt'].min()
                     st.info(f"📊 Loaded {len(df)} records | Data range: {earliest_in_data} to {latest_in_data}")
                     st.caption(f"Query range: {start_date_str} to {end_date_str}")
+                    # Show timezone and server info for debugging
+                    st.caption(f"🕐 MySQL timezone: {mysql_tz} | MySQL server time: {mysql_now}")
                 conn.close()
                 # Log successful connection - minimized for cleaner UI
                 # Only show success message if there are issues, otherwise keep UI clean
