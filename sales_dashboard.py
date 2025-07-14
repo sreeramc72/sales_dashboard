@@ -399,11 +399,14 @@ def add_calculated_columns(df):
     return df
 
 @st.cache_data(ttl=3600)  # Cache for 1 hour (increased from 5 minutes)
-def load_data_from_mysql(days_back=7, max_retries=3):
-    """Load data from MySQL database with optimized query for better performance
+def load_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retries=3):
+    """
+    Load sales data from MySQL with retry logic and caching.
     
     Args:
-        days_back: Number of days of data to fetch
+        start_date: Start date for data range (date object)
+        end_date: End date for data range (date object)
+        days_back: Number of days of data to fetch (fallback if dates not provided)
         max_retries: Maximum number of connection retry attempts
         
     Returns:
@@ -446,13 +449,21 @@ def load_data_from_mysql(days_back=7, max_retries=3):
                     database=aws_db,
                     connection_timeout=connection_timeout
                 )
-                # Optimized query: Select only required columns, use WHERE clause first
+                # Optimized query: Select only required columns, use specific date range
+                from datetime import datetime
+                start_date_str = datetime.combine(datetime.strptime(str(start_date), '%Y-%m-%d').date(), datetime.min.time()).strftime('%Y-%m-%d %H:%M:%S')
+                # For end date, if it's today, use current time; otherwise use end of day
+                if str(end_date) == str(datetime.now().date()):
+                    end_date_str = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    end_date_str = datetime.combine(datetime.strptime(str(end_date), '%Y-%m-%d').date(), datetime.max.time()).strftime('%Y-%m-%d %H:%M:%S')
+                
                 query = f"""
                 SELECT OrderID, CustomerName, Telephone, ReceivedAt, GrossPrice, Discount, 
                        Delivery, Tips, VAT, Surcharge, Total, 
                        Channel, Brand, Location, PaymentMethod
                 FROM sales_data 
-                WHERE ReceivedAt >= DATE_SUB(NOW(), INTERVAL {days_back} DAY)
+                WHERE ReceivedAt >= '{start_date_str}' AND ReceivedAt <= '{end_date_str}'
                 ORDER BY ReceivedAt DESC
                 """
                 # Load data in chunks if it's large
@@ -2512,16 +2523,17 @@ def main():
         st.success("🔗 Connected to AWS MySQL Database")
         st.caption(f"Host: {db_host}")
 
-        # Date range filter (Default: Last 30 days)
+        # Date range filter (Default: Month start to today)
         st.subheader("Date Range Filter")
         today = datetime.now().date()
-        default_start = today - timedelta(days=30)  # Last 30 days
-        default_end = today
+        default_start = today.replace(day=1)  # Start of current month
+        # Set end date to today to capture all of today's data
+        default_end = today  # Today's date to capture current day data
         date_range = st.date_input(
             "Select date range",
             value=(default_start, default_end),
             min_value=today - timedelta(days=90),
-            max_value=today
+            max_value=today + timedelta(days=30)  # Allow future dates
         )
         # Ensure date_range is always a tuple (start, end)
         if isinstance(date_range, tuple) and len(date_range) == 2:
@@ -2546,8 +2558,10 @@ def main():
             st.caption("No brand data available.")
 
         # Calculate days_back for backward compatibility (for MySQL/BigQuery loaders)
-        days_back = max((today - start_date).days + 1, 30)  # Ensure minimum 30 days
-        st.info(f"📊 Fetching {days_back} days of data from database")
+        days_back = max((end_date - start_date).days + 1, 30)  # Ensure minimum 30 days
+        display_days = (end_date - start_date).days + 1
+        st.info(f"📊 Month-to-Latest: {display_days} days ({start_date} to {end_date})")
+        st.caption(f"Capturing all available data from month start to latest date for accurate sync")
         refresh_button = st.button("Refresh Data")
 
         # Add a progress indicator in sidebar
@@ -2576,7 +2590,7 @@ def main():
             loading_message = f"Loading optimized data for the last {days_back} days from AWS MySQL..."
             with st.spinner(loading_message):
                 # Load data from AWS MySQL database
-                df = load_data_from_mysql(days_back)
+                df = load_data_from_mysql(start_date=start_date, end_date=end_date, days_back=days_back)
                 if not df.empty:
                     df = add_essential_calculated_columns(df)
                     st.session_state.df = df
@@ -2741,7 +2755,24 @@ def main():
         with tabs[0]:
             # Month-to-Date (MTD) Analysis Tab
             st.header("📅 Month-to-Date (MTD) Analysis")
+            
+            # Display current MTD period clearly
+            current_month = datetime.now().strftime("%B %Y")
+            month_start = datetime.now().date().replace(day=1)
+            st.info(f"📊 **Current MTD Period**: {current_month} (from {month_start.strftime('%B 1, %Y')} to latest available data)")
+            
+            # Validate that we're actually showing MTD data
+            if start_date != month_start:
+                st.warning(f"⚠️ **Note**: Date filter is set to {start_date}, but true MTD should start from {month_start}. Consider adjusting the date range for accurate MTD analysis.")
+            
             mtd_df = filtered_df.copy()
+            
+            # Show data range summary
+            if not mtd_df.empty and 'Date' in mtd_df.columns:
+                actual_start = mtd_df['Date'].min().date()
+                actual_end = mtd_df['Date'].max().date()
+                st.caption(f"📈 **Data Range**: {actual_start} to {actual_end} ({len(mtd_df):,} records)")
+            
             # Show summary metrics
             metrics = calculate_metrics(mtd_df)
             if metrics:
@@ -2973,33 +3004,307 @@ def main():
         with tabs[6]:
             # Shady's Command Center Tab (Pivot Table + Custom Prediction)
             st.header("🎮 Shady's Command Center")
-            # --- Date Filter and Pivot Table Analysis ---
-            # This block sets start_date and end_date for the tab
-            # ...existing code for date filter and pivot table config...
-            # (Find the block where start_date and end_date are set from the tab's date filter)
-            # After the date filter and before displaying the pivot table, insert the prediction logic:
-            # --- Custom Sales Prediction (Removed) ---
-            # If you want to add a new prediction logic, implement here as per your formula
-            # ---
+            
+            # --- Time-Synchronized Two-Day Pivot Table Comparison ---
+            st.subheader("🔄 Time-Synchronized Two-Day Pivot Table Comparison")
+            st.info("📊 This analysis compares the latest two days with precise time synchronization for accurate pivot table analysis.")
+            
+            if 'Date' in filtered_df.columns and 'ReceivedAt' in filtered_df.columns:
+                # Get unique sorted dates (descending to get latest first)
+                unique_dates = sorted(filtered_df['Date'].unique(), reverse=True)
+                
+                if len(unique_dates) >= 2:
+                    latest_day = unique_dates[0]
+                    second_latest_day = unique_dates[1]
+                    
+                    st.write(f"**Latest Day:** {latest_day}")
+                    st.write(f"**Second Latest Day:** {second_latest_day}")
+                    
+                    # Get data for both days
+                    latest_day_df = filtered_df[filtered_df['Date'] == latest_day].copy()
+                    second_latest_day_df = filtered_df[filtered_df['Date'] == second_latest_day].copy()
+                    
+                    if not latest_day_df.empty and not second_latest_day_df.empty:
+                        # Find the latest timestamp on the latest day
+                        latest_timestamp = latest_day_df['ReceivedAt'].max()
+                        latest_time_only = latest_timestamp.time()
+                        
+                        st.write(f"**Latest data timestamp:** {latest_timestamp} (Time: {latest_time_only})")
+                        
+                        # Filter second latest day to only include data up to the same time
+                        second_latest_day_df['ReceivedTime'] = pd.to_datetime(second_latest_day_df['ReceivedAt']).dt.time
+                        time_synced_second_day_df = second_latest_day_df[
+                            second_latest_day_df['ReceivedTime'] <= latest_time_only
+                        ].copy()
+                        
+                        st.write(f"**Time-synchronized comparison:** Comparing full latest day vs second latest day up to {latest_time_only}")
+                        
+                        # --- Overall Metrics Comparison ---
+                        st.markdown("### 📊 Overall Metrics Comparison")
+                        metrics_cols = ['net_sale', 'Calculated_Discount', 'Profit_Margin']
+                        available_metrics = [col for col in metrics_cols if col in filtered_df.columns]
+                        
+                        if available_metrics:
+                            # Calculate metrics for both periods
+                            latest_metrics = {
+                                'Orders': len(latest_day_df),
+                                **{col: latest_day_df[col].sum() for col in available_metrics}
+                            }
+                            
+                            second_latest_metrics = {
+                                'Orders': len(time_synced_second_day_df),
+                                **{col: time_synced_second_day_df[col].sum() for col in available_metrics}
+                            }
+                            
+                            # Create comparison DataFrame
+                            comparison_df = pd.DataFrame({
+                                f'Latest Day ({latest_day})': latest_metrics,
+                                f'Second Latest Day ({second_latest_day}) - Time Synced': second_latest_metrics
+                            })
+                            
+                            # Calculate differences
+                            comparison_df['Δ (Latest - Second)'] = (
+                                comparison_df[f'Latest Day ({latest_day})'] - 
+                                comparison_df[f'Second Latest Day ({second_latest_day}) - Time Synced']
+                            )
+                            
+                            # Calculate percentage change
+                            comparison_df['% Change'] = (
+                                (comparison_df['Δ (Latest - Second)'] / 
+                                 comparison_df[f'Second Latest Day ({second_latest_day}) - Time Synced'].replace(0, 1)) * 100
+                            ).round(2)
+                            
+                            st.dataframe(comparison_df.round(2), use_container_width=True)
+                            
+                            # --- Location Analysis: Top 10 & Bottom 10 ---
+                            if 'Location' in filtered_df.columns:
+                                st.markdown("### 📍 Location Analysis - Time-Synchronized Comparison")
+                                
+                                # Latest day location performance
+                                latest_location = latest_day_df.groupby('Location').agg({
+                                    'net_sale': 'sum',
+                                    'OrderID': 'count',
+                                    'Calculated_Discount': 'sum' if 'Calculated_Discount' in latest_day_df.columns else lambda x: 0,
+                                    'Profit_Margin': 'sum' if 'Profit_Margin' in latest_day_df.columns else lambda x: 0
+                                }).round(2)
+                                
+                                # Time-synced second day location performance
+                                second_location = time_synced_second_day_df.groupby('Location').agg({
+                                    'net_sale': 'sum',
+                                    'OrderID': 'count',
+                                    'Calculated_Discount': 'sum' if 'Calculated_Discount' in time_synced_second_day_df.columns else lambda x: 0,
+                                    'Profit_Margin': 'sum' if 'Profit_Margin' in time_synced_second_day_df.columns else lambda x: 0
+                                }).round(2)
+                                
+                                # Calculate location differences
+                                location_comparison = latest_location.subtract(second_location, fill_value=0).round(2)
+                                location_comparison.columns = [f'Δ_{col}' for col in location_comparison.columns]
+                                
+                                # Combine all location data
+                                combined_location = pd.concat([
+                                    latest_location.add_suffix('_Latest'),
+                                    second_location.add_suffix('_Second_Synced'),
+                                    location_comparison
+                                ], axis=1).fillna(0)
+                                
+                                # Top 10 and Bottom 10 by net sales change
+                                if 'Δ_net_sale' in combined_location.columns:
+                                    top_10_locations = combined_location.nlargest(10, 'Δ_net_sale')
+                                    bottom_10_locations = combined_location.nsmallest(10, 'Δ_net_sale')
+                                    
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.write("#### 🔝 Top 10 Locations (Biggest Improvement)")
+                                        st.dataframe(sanitize_for_streamlit(top_10_locations), use_container_width=True)
+                                    
+                                    with col2:
+                                        st.write("#### 🔻 Bottom 10 Locations (Biggest Decline)")
+                                        st.dataframe(sanitize_for_streamlit(bottom_10_locations), use_container_width=True)
+                                    
+                                    st.write("#### 📋 Combined Location Analysis")
+                                    st.dataframe(sanitize_for_streamlit(combined_location.sort_values('Δ_net_sale', ascending=False)), use_container_width=True)
+                            
+                            # --- Brand Analysis: Top 10 & Bottom 10 ---
+                            if 'Brand' in filtered_df.columns:
+                                st.markdown("### 🏷️ Brand Analysis - Time-Synchronized Comparison")
+                                
+                                # Latest day brand performance
+                                latest_brand = latest_day_df.groupby('Brand').agg({
+                                    'net_sale': 'sum',
+                                    'OrderID': 'count',
+                                    'Calculated_Discount': 'sum' if 'Calculated_Discount' in latest_day_df.columns else lambda x: 0,
+                                    'Profit_Margin': 'sum' if 'Profit_Margin' in latest_day_df.columns else lambda x: 0
+                                }).round(2)
+                                
+                                # Time-synced second day brand performance
+                                second_brand = time_synced_second_day_df.groupby('Brand').agg({
+                                    'net_sale': 'sum',
+                                    'OrderID': 'count',
+                                    'Calculated_Discount': 'sum' if 'Calculated_Discount' in time_synced_second_day_df.columns else lambda x: 0,
+                                    'Profit_Margin': 'sum' if 'Profit_Margin' in time_synced_second_day_df.columns else lambda x: 0
+                                }).round(2)
+                                
+                                # Calculate brand differences
+                                brand_comparison = latest_brand.subtract(second_brand, fill_value=0).round(2)
+                                brand_comparison.columns = [f'Δ_{col}' for col in brand_comparison.columns]
+                                
+                                # Combine all brand data
+                                combined_brand = pd.concat([
+                                    latest_brand.add_suffix('_Latest'),
+                                    second_brand.add_suffix('_Second_Synced'),
+                                    brand_comparison
+                                ], axis=1).fillna(0)
+                                
+                                # Top 10 and Bottom 10 by net sales change
+                                if 'Δ_net_sale' in combined_brand.columns:
+                                    top_10_brands = combined_brand.nlargest(10, 'Δ_net_sale')
+                                    bottom_10_brands = combined_brand.nsmallest(10, 'Δ_net_sale')
+                                    
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.write("#### 🔝 Top 10 Brands (Biggest Improvement)")
+                                        st.dataframe(sanitize_for_streamlit(top_10_brands), use_container_width=True)
+                                    
+                                    with col2:
+                                        st.write("#### 🔻 Bottom 10 Brands (Biggest Decline)")
+                                        st.dataframe(sanitize_for_streamlit(bottom_10_brands), use_container_width=True)
+                                    
+                                    st.write("#### 📋 Combined Brand Analysis")
+                                    st.dataframe(sanitize_for_streamlit(combined_brand.sort_values('Δ_net_sale', ascending=False)), use_container_width=True)
+                            
+                            # --- Channel Analysis: Top 10 & Bottom 10 ---
+                            if 'Channel' in filtered_df.columns:
+                                st.markdown("### 📺 Channel Analysis - Time-Synchronized Comparison")
+                                
+                                # Latest day channel performance
+                                latest_channel = latest_day_df.groupby('Channel').agg({
+                                    'net_sale': 'sum',
+                                    'OrderID': 'count',
+                                    'Calculated_Discount': 'sum' if 'Calculated_Discount' in latest_day_df.columns else lambda x: 0,
+                                    'Profit_Margin': 'sum' if 'Profit_Margin' in latest_day_df.columns else lambda x: 0
+                                }).round(2)
+                                
+                                # Time-synced second day channel performance
+                                second_channel = time_synced_second_day_df.groupby('Channel').agg({
+                                    'net_sale': 'sum',
+                                    'OrderID': 'count',
+                                    'Calculated_Discount': 'sum' if 'Calculated_Discount' in time_synced_second_day_df.columns else lambda x: 0,
+                                    'Profit_Margin': 'sum' if 'Profit_Margin' in time_synced_second_day_df.columns else lambda x: 0
+                                }).round(2)
+                                
+                                # Calculate channel differences
+                                channel_comparison = latest_channel.subtract(second_channel, fill_value=0).round(2)
+                                channel_comparison.columns = [f'Δ_{col}' for col in channel_comparison.columns]
+                                
+                                # Combine all channel data
+                                combined_channel = pd.concat([
+                                    latest_channel.add_suffix('_Latest'),
+                                    second_channel.add_suffix('_Second_Synced'),
+                                    channel_comparison
+                                ], axis=1).fillna(0)
+                                
+                                # Top 10 and Bottom 10 by net sales change
+                                if 'Δ_net_sale' in combined_channel.columns:
+                                    top_10_channels = combined_channel.nlargest(10, 'Δ_net_sale')
+                                    bottom_10_channels = combined_channel.nsmallest(10, 'Δ_net_sale')
+                                    
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        st.write("#### 🔝 Top 10 Channels (Biggest Improvement)")
+                                        st.dataframe(sanitize_for_streamlit(top_10_channels), use_container_width=True)
+                                    
+                                    with col2:
+                                        st.write("#### 🔻 Bottom 10 Channels (Biggest Decline)")
+                                        st.dataframe(sanitize_for_streamlit(bottom_10_channels), use_container_width=True)
+                                    
+                                    st.write("#### 📋 Combined Channel Analysis")
+                                    st.dataframe(sanitize_for_streamlit(combined_channel.sort_values('Δ_net_sale', ascending=False)), use_container_width=True)
+                            
+                            # --- Visualization ---
+                            st.markdown("### 📈 Visual Comparison")
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.write("#### Net Sales Comparison")
+                                if 'net_sale' in available_metrics:
+                                    sales_chart_data = pd.DataFrame({
+                                        'Net Sales': [
+                                            latest_metrics['net_sale'],
+                                            second_latest_metrics['net_sale']
+                                        ]
+                                    }, index=[f'Latest ({latest_day})', f'Second Latest ({second_latest_day}) - Synced'])
+                                    st.bar_chart(sales_chart_data)
+                            
+                            with col2:
+                                st.write("#### Orders Comparison")
+                                orders_chart_data = pd.DataFrame({
+                                    'Orders': [
+                                        latest_metrics['Orders'],
+                                        second_latest_metrics['Orders']
+                                    ]
+                                }, index=[f'Latest ({latest_day})', f'Second Latest ({second_latest_day}) - Synced'])
+                                st.bar_chart(orders_chart_data)
+                            
+                            # --- Insights ---
+                            st.markdown("### 💡 Time-Synchronized Analysis Insights")
+                            
+                            if 'net_sale' in available_metrics:
+                                sales_diff = comparison_df.loc['net_sale', 'Δ (Latest - Second)']
+                                sales_pct = comparison_df.loc['net_sale', '% Change']
+                                
+                                if sales_diff > 0:
+                                    st.write(f"🟢 **Sales Performance:** Net sales increased by {sales_diff:.2f} ({sales_pct:+.1f}%) compared to the same time period yesterday.")
+                                else:
+                                    st.write(f"🔴 **Sales Performance:** Net sales decreased by {abs(sales_diff):.2f} ({sales_pct:+.1f}%) compared to the same time period yesterday.")
+                            
+                            orders_diff = comparison_df.loc['Orders', 'Δ (Latest - Second)']
+                            orders_pct = comparison_df.loc['Orders', '% Change']
+                            
+                            if orders_diff > 0:
+                                st.write(f"📈 **Order Volume:** {orders_diff:+.0f} more orders ({orders_pct:+.1f}%) compared to the same time period yesterday.")
+                            else:
+                                st.write(f"📉 **Order Volume:** {abs(orders_diff):.0f} fewer orders ({orders_pct:+.1f}%) compared to the same time period yesterday.")
+                            
+                            if 'Calculated_Discount' in available_metrics:
+                                discount_diff = comparison_df.loc['Calculated_Discount', 'Δ (Latest - Second)']
+                                if discount_diff > 0:
+                                    st.write(f"💰 **Discount Analysis:** Discount spending increased by {discount_diff:.2f}. Monitor if this drove incremental sales.")
+                                elif discount_diff < 0:
+                                    st.write(f"💰 **Discount Analysis:** Discount spending decreased by {abs(discount_diff):.2f}. Good cost control.")
+                            
+                            st.write("\n**🎯 Key Benefit:** This time-synchronized comparison ensures fair day-to-day analysis by comparing equivalent time periods, eliminating bias from different operating hours or data collection times.")
+                            
+                            # Data quality info
+                            st.write("#### 📋 Data Quality Information")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.metric("Latest Day Records", len(latest_day_df))
+                                st.metric("Latest Timestamp", str(latest_timestamp))
+                            with col2:
+                                st.metric("Second Latest Day Records (Full)", len(second_latest_day_df))
+                                st.metric("Second Latest Day Records (Time-Synced)", len(time_synced_second_day_df))
+                        
+                        else:
+                            st.warning("⚠️ Required metrics columns not found for comparison analysis.")
+                    else:
+                        st.warning("⚠️ Insufficient data for the latest two days.")
+                else:
+                    st.info("📊 Need at least 2 days of data for time-synchronized comparison.")
+            else:
+                st.warning("⚠️ Date and ReceivedAt columns required for time-synchronized analysis.")
+            
+            # --- Existing Pivot Table Analysis (Preserved) ---
+            st.markdown("---")
             st.header("Pivot Table Analysis")
             try:
                 create_pivot_table_analysis(filtered_df)
-            except Exception as e:
-                st.error(f"Error in pivot table analysis: {e}")
-            st.write("### Data Preview")
-            st.dataframe(filtered_df.head(20), use_container_width=True)
 
         # 8. Period Comparison Tab
         with tabs[7]:
-            # Period Comparison Tab
             st.header("📅 Period Comparison")
-            st.write("### Data Preview for Selected Period")
-            st.dataframe(filtered_df.head(20), use_container_width=True)
-            st.write("### Data Summary")
-            st.dataframe(filtered_df.describe(include='all').T)
-
-            # --- Deep Dive: Period-over-Period Comparison ---
-            st.subheader("🔍 Deep Dive: Period-over-Period Comparison")
+            
+            # --- Simple Period-over-Period Comparison ---
+            st.subheader("🔍 Period-over-Period Comparison")
             if 'Date' in filtered_df.columns:
                 # Allow user to select two periods (date ranges)
                 unique_dates = sorted(filtered_df['Date'].unique())
@@ -3009,41 +3314,63 @@ def main():
                         period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0)
                     with col2:
                         period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0)
+                    
                     df1 = filtered_df[filtered_df['Date'] == period1]
                     df2 = filtered_df[filtered_df['Date'] == period2]
+                    
                     # Key metrics to compare
                     metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
-                    summary1 = df1[metrics].sum(numeric_only=True)
-                    summary2 = df2[metrics].sum(numeric_only=True)
-                    diff = summary2 - summary1
-                    comp_df = pd.DataFrame({
-                        f'{period1}': summary1,
-                        f'{period2}': summary2,
-                        'Δ (Second - First)': diff
-                    })
-                    st.write("#### Key Metrics Comparison")
-                    st.dataframe(comp_df.round(2))
-                    # Visualize
-                    st.write("#### Net Sales Comparison")
-                    st.bar_chart(pd.DataFrame({'Net Sale': [summary1['net_sale'], summary2['net_sale']]}, index=[str(period1), str(period2)]))
-                    # Insights
-                    st.markdown("### 💡 Period Comparison Insights")
-                    if diff['net_sale'] > 0:
-                        st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
+                    available_metrics = [col for col in metrics if col in filtered_df.columns]
+                    
+                    if available_metrics:
+                        summary1 = df1[available_metrics].sum(numeric_only=True)
+                        summary2 = df2[available_metrics].sum(numeric_only=True)
+                        diff = summary2 - summary1
+                        
+                        comp_df = pd.DataFrame({
+                            f'{period1}': summary1,
+                            f'{period2}': summary2,
+                            'Δ (Second - First)': diff
+                        })
+                        
+                        st.write("#### Key Metrics Comparison")
+                        st.dataframe(comp_df.round(2))
+                        
+                        # Visualize
+                        if 'net_sale' in available_metrics:
+                            st.write("#### Net Sales Comparison")
+                            st.bar_chart(pd.DataFrame({
+                                'Net Sale': [summary1['net_sale'], summary2['net_sale']]
+                            }, index=[str(period1), str(period2)]))
+                        
+                        # Insights
+                        st.markdown("### 💡 Period Comparison Insights")
+                        if 'net_sale' in available_metrics:
+                            if diff['net_sale'] > 0:
+                                st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
+                            else:
+                                st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
+                        
+                        if 'Profit_Margin' in available_metrics and diff['Profit_Margin'] < 0:
+                            st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
+                        
+                        if 'Calculated_Discount' in available_metrics and diff['Calculated_Discount'] > 0:
+                            st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
+                        
+                        st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
                     else:
-                        st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
-                    if diff['Profit_Margin'] < 0:
-                        st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
-                    if diff['Calculated_Discount'] > 0:
-                        st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
-                    st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
+                        st.warning("⚠️ Required metrics columns not found for comparison.")
                 else:
                     st.info("Not enough unique dates for period comparison.")
             else:
                 st.info("Date column not found for period comparison.")
+            
+            # Data preview section
+            st.write("### 📋 Data Preview for Selected Period")
+            st.dataframe(filtered_df.head(20), use_container_width=True)
 
-        # 8. Data Overview Tab
-        with tabs[7]:
+        # 9. Data Overview Tab
+        with tabs[8]:
             # Data Overview Tab
             st.header("📋 Data Overview")
             st.write("### Data Columns and Types")
