@@ -2765,7 +2765,19 @@ def main():
             if start_date != month_start:
                 st.warning(f"⚠️ **Note**: Date filter is set to {start_date}, but true MTD should start from {month_start}. Consider adjusting the date range for accurate MTD analysis.")
             
-            mtd_df = filtered_df.copy()
+            # Filter data to only show Month-To-Date (from month start to today)
+            if 'Date' in filtered_df.columns:
+                # Ensure Date is datetime64[ns] for comparison
+                if not pd.api.types.is_datetime64_any_dtype(filtered_df['Date']):
+                    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'])
+                # Filter to only MTD data (from month start to today)
+                month_start_ts = pd.Timestamp(month_start)
+                today_ts = pd.Timestamp(datetime.now().date())
+                mtd_df = filtered_df[(filtered_df['Date'] >= month_start_ts) & (filtered_df['Date'] <= today_ts)].copy()
+                st.success(f"✅ **MTD Data**: Showing {len(mtd_df):,} records from {month_start} to today")
+            else:
+                mtd_df = filtered_df.copy()
+                st.warning("⚠️ No Date column found - showing all filtered data")
             
             # Show data range summary
             if not mtd_df.empty and 'Date' in mtd_df.columns:

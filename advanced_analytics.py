@@ -35,15 +35,22 @@ def sanitize_for_streamlit(df):
 
 def find_customer_id_column(df):
     """Automatically detect the customer identifier column."""
+    # First check for standard customer ID columns
     possible_customer_cols = ['Customer_ID', 'customer_id', 'CustomerID', 'customerId', 'Customer', 'customer', 'Client_ID', 'client_id', 'ClientID', 'User_ID', 'user_id', 'UserID']
     
     for col in possible_customer_cols:
         if col in df.columns:
             return col
     
+    # Check for actual columns in the sales data structure
+    if 'CustomerName' in df.columns:
+        return 'CustomerName'
+    elif 'Telephone' in df.columns:
+        return 'Telephone'
+    
     # If no standard customer column found, look for columns with 'customer', 'client', or 'user' in the name
     for col in df.columns:
-        if any(keyword in col.lower() for keyword in ['customer', 'client', 'user']):
+        if any(keyword in col.lower() for keyword in ['customer', 'client', 'user', 'name', 'phone', 'telephone']):
             return col
     
     return None
