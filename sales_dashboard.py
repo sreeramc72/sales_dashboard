@@ -3310,6 +3310,8 @@ def main():
             st.header("Pivot Table Analysis")
             try:
                 create_pivot_table_analysis(filtered_df)
+            except Exception as e:
+                st.error(f"Error in pivot table analysis: {str(e)}")
 
         # 8. Period Comparison Tab
         with tabs[7]:
