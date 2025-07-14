@@ -478,7 +478,7 @@ def display_rfm_analysis(df):
     
     # Top customers by segment
     st.subheader("Sample Customers by Segment")
-    selected_segment = st.selectbox("Select a segment to view customers:", rfm_data['Segment'].unique())
+    selected_segment = st.selectbox("Select a segment to view customers:", rfm_data['Segment'].unique(), key="rfm_segment_selectbox")
     segment_customers = rfm_data[rfm_data['Segment'] == selected_segment].head(10)
     display_cols = ['Customer_ID', 'Recency', 'Frequency', 'Monetary', 'RFM_Score']
     st.dataframe(sanitize_for_streamlit(segment_customers[display_cols]), use_container_width=True)

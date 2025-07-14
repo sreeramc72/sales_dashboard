@@ -400,7 +400,7 @@ def add_calculated_columns(df):
     return df
 
 # --- Intelligent Caching System ---
-@st.cache_data(ttl=600)  # Cache for 10 minutes
+@st.cache_data(ttl=60)  # Cache for 1 minute to ensure fresh data detection
 def get_latest_data_timestamp():
     """Get the latest ReceivedAt timestamp from MySQL to check for new data."""
     try:
@@ -439,7 +439,7 @@ def get_latest_data_timestamp():
         st.warning(f"Could not check for new data: {e}")
         return None
 
-@st.cache_data(ttl=600)  # Cache for 10 minutes
+@st.cache_data(ttl=60)  # Cache for 1 minute to ensure fresh data detection
 def get_data_hash(start_date, end_date):
     """Generate a hash of current data parameters and latest timestamp for cache invalidation."""
     latest_timestamp = get_latest_data_timestamp()
@@ -449,7 +449,7 @@ def get_data_hash(start_date, end_date):
         return hashlib.md5(hash_input.encode()).hexdigest()
     return None
 
-@st.cache_data(ttl=600, show_spinner="🔄 Loading fresh data from MySQL...")  # Cache for 10 minutes
+@st.cache_data(ttl=120, show_spinner="🔄 Loading fresh data from MySQL...")  # Cache for 2 minutes to ensure fresh data
 def _load_data_with_hash(data_hash, start_date=None, end_date=None, days_back=7, max_retries=3):
     """
     Internal function to load data with hash-based caching.
@@ -572,13 +572,15 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
                 # st.code(f"Query: SELECT ... FROM sales_data WHERE ReceivedAt >= DATE_SUB(NOW(), INTERVAL {days_back} DAY)")
                 df = pd.read_sql(query, conn, parse_dates=['ReceivedAt'])
                 
-                # Debug information - minimized for cleaner UI
+                # Debug information - show data range for troubleshooting
                 if df.empty:
                     st.warning("No data returned from query - checking if table exists and has data")
-                # Only show essential info, not verbose date range details
-                # if not df.empty:
-                #     date_range_info = f"Data range: {df['ReceivedAt'].min()} to {df['ReceivedAt'].max()}"
-                #     st.info(date_range_info)
+                else:
+                    # Show actual data range loaded for debugging data freshness issues
+                    latest_in_data = df['ReceivedAt'].max()
+                    earliest_in_data = df['ReceivedAt'].min()
+                    st.info(f"📊 Loaded {len(df)} records | Data range: {earliest_in_data} to {latest_in_data}")
+                    st.caption(f"Query range: {start_date_str} to {end_date_str}")
                 conn.close()
                 # Log successful connection - minimized for cleaner UI
                 # Only show success message if there are issues, otherwise keep UI clean
@@ -1174,10 +1176,10 @@ def create_pivot_table_analysis(df):
         # Generate predictions for today
         current_date = datetime.now().date()
         
-        # Get historical data for prediction (last 30 days)
+        # Use the full filtered dataset for prediction (already filtered by date range in main function)
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'])
-            historical_data = df[df['Date'] >= (pd.Timestamp.now() - pd.Timedelta(days=30))]
+            historical_data = df  # Use full filtered dataset instead of hardcoded 30-day limit
             
             if len(historical_data) >= 7:  # Need at least a week of data
                 # Calculate daily averages for prediction
@@ -1406,7 +1408,8 @@ def create_pivot_table_analysis(df):
                 options=list(range(max_hour + 1)),
                 index=max_hour,
                 format_func=lambda x: f"Up to {x:02d}:xx ({x+1} hours)",
-                help=f"Select maximum hour to include. This will override the exact sync filter."
+                help=f"Select maximum hour to include. This will override the exact sync filter.",
+                key="hour_filter_selectbox"
             )
             # Apply hour filter to the data (all dates)
             df_filtered = df_filtered[df_filtered['Hour'] <= selected_max_hour].copy()
@@ -1802,7 +1805,8 @@ def create_pivot_table_analysis(df):
                         "📊 Select Analysis Dimension:",
                         options=analysis_dimensions,
                         index=0,
-                        help="Choose which dimension to analyze for top/bottom performance"
+                        help="Choose which dimension to analyze for top/bottom performance",
+                        key="analysis_dimension_selectbox"
                     )
                     
                     if selected_dimension in df_filtered.columns:
@@ -2499,14 +2503,16 @@ def create_pivot_table_analysis(df):
                 "Select value to aggregate:",
                 options=available_numeric,
                 index=0 if available_numeric else None,
-                help="Choose numeric column to aggregate"
+                help="Choose numeric column to aggregate",
+                key="pivot_values_selectbox"
             )
             
             aggregation = st.selectbox(
                 "Aggregation function:",
                 options=['sum', 'mean', 'count', 'median', 'std', 'min', 'max'],
                 index=0,
-                help="Choose how to aggregate the values"
+                help="Choose how to aggregate the values",
+                key="pivot_aggregation_selectbox"
             )
         
         if not rows or not values:
@@ -3270,9 +3276,9 @@ def main():
                 if len(unique_dates) >= 2:
                     col1, col2 = st.columns(2)
                     with col1:
-                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0)
+                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0, key=f"period1_selectbox_{hash(str(unique_dates))}")
                     with col2:
-                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0)
+                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0, key=f"period2_selectbox_{hash(str(unique_dates))}")
                     
                     df1 = filtered_df[filtered_df['Date'] == period1]
                     df2 = filtered_df[filtered_df['Date'] == period2]
@@ -3338,9 +3344,9 @@ def main():
                 if len(unique_dates) >= 2:
                     col1, col2 = st.columns(2)
                     with col1:
-                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0)
+                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0, key=f"period1_selectbox_{hash(str(unique_dates))}")
                     with col2:
-                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0)
+                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0, key=f"period2_selectbox_{hash(str(unique_dates))}")
                     
                     df1 = filtered_df[filtered_df['Date'] == period1]
                     df2 = filtered_df[filtered_df['Date'] == period2]
