@@ -552,25 +552,30 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
                     database=aws_db,
                     connection_timeout=connection_timeout
                 )
-                # Optimized query: Select only required columns, use specific date range with timezone handling
-                # Check MySQL timezone and use appropriate time reference
+                # Optimized query: Select only required columns, use UAE timezone for data loading
+                # UAE timezone is UTC+4 (Gulf Standard Time)
+                uae_tz = pytz.timezone('Asia/Dubai')
+                uae_now = datetime.now(uae_tz)
+                
+                # Get MySQL timezone info for debugging
                 cursor = conn.cursor()
                 cursor.execute("SELECT @@session.time_zone, NOW()")
                 mysql_tz, mysql_now = cursor.fetchone()
                 cursor.close()
                 
-                # Use MySQL server time as reference to avoid timezone mismatches
-                # This ensures we're always in sync with the database's timezone
+                # Always use UAE timezone for determining 'today' and data loading
                 start_date_str = datetime.combine(datetime.strptime(str(start_date), '%Y-%m-%d').date(), datetime.min.time()).strftime('%Y-%m-%d %H:%M:%S')
                 
-                # For end date, if it's today, use MySQL server's current time; otherwise use end of day
+                # For end date, if it's today in UAE timezone, load all available data for the present day
                 today_check = datetime.strptime(str(end_date), '%Y-%m-%d').date()
-                mysql_today = mysql_now.date() if mysql_now else datetime.now().date()
+                uae_today = uae_now.date()
                 
-                if today_check == mysql_today:
-                    # Use MySQL server's current time to capture all data up to now
-                    end_date_str = mysql_now.strftime('%Y-%m-%d %H:%M:%S') if mysql_now else datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                if today_check == uae_today:
+                    # For present day in UAE timezone, load ALL available data regardless of time
+                    # Use end of day to capture all data for today
+                    end_date_str = datetime.combine(uae_today, datetime.max.time()).strftime('%Y-%m-%d %H:%M:%S')
                 else:
+                    # For past dates, use end of day
                     end_date_str = datetime.combine(datetime.strptime(str(end_date), '%Y-%m-%d').date(), datetime.max.time()).strftime('%Y-%m-%d %H:%M:%S')
                 
                 query = f"""
@@ -597,6 +602,7 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
                     st.caption(f"Query range: {start_date_str} to {end_date_str}")
                     # Show timezone and server info for debugging
                     st.caption(f"🕐 MySQL timezone: {mysql_tz} | MySQL server time: {mysql_now}")
+                    st.caption(f"🇦🇪 UAE timezone: Asia/Dubai (+04:00) | UAE current time: {uae_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
                 conn.close()
                 # Log successful connection - minimized for cleaner UI
                 # Only show success message if there are issues, otherwise keep UI clean
@@ -2648,12 +2654,15 @@ def main():
         st.success("🔗 Connected to AWS MySQL Database")
         st.caption(f"Host: {db_host}")
 
-        # Date range filter (Default: Month start to today)
+        # Date range filter (Default: Month start to today in UAE timezone)
         st.subheader("Date Range Filter")
-        today = datetime.now().date()
-        default_start = today.replace(day=1)  # Start of current month
-        # Set end date to today to capture all of today's data
-        default_end = today  # Today's date to capture current day data
+        # Use UAE timezone for determining 'today' and default date range
+        uae_tz = pytz.timezone('Asia/Dubai')
+        uae_now = datetime.now(uae_tz)
+        today = uae_now.date()  # Today according to UAE timezone
+        default_start = today.replace(day=1)  # Start of current month in UAE timezone
+        # Set end date to today to capture all of today's data in UAE timezone
+        default_end = today  # Today's date in UAE timezone to capture current day data
         date_range = st.date_input(
             "Select date range",
             value=(default_start, default_end),
@@ -2687,6 +2696,9 @@ def main():
         display_days = (end_date - start_date).days + 1
         st.info(f"📊 Month-to-Latest: {display_days} days ({start_date} to {end_date})")
         st.caption(f"Capturing all available data from month start to latest date for accurate sync")
+        # Show UAE timezone info
+        st.success(f"🇦🇪 UAE Time: {uae_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
+        st.caption("Dashboard follows UAE timezone (Asia/Dubai +04:00) for data loading")
         refresh_button = st.button("🔄 Refresh Data", help="Always fetches latest data from server, bypassing cache")
 
         # Add a progress indicator in sidebar
