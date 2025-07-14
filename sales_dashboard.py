@@ -398,10 +398,110 @@ def add_calculated_columns(df):
     
     return df
 
-@st.cache_data(ttl=3600)  # Cache for 1 hour (increased from 5 minutes)
+# --- Intelligent Caching System ---
+@st.cache_data(ttl=600)  # Cache for 10 minutes
+def get_latest_data_timestamp():
+    """Get the latest ReceivedAt timestamp from MySQL to check for new data."""
+    try:
+        # Get AWS MySQL credentials
+        try:
+            aws_host = st.secrets["MYSQL_HOST"]
+            aws_db = st.secrets["MYSQL_DB"]
+            aws_user = st.secrets["MYSQL_USER"]
+            aws_pass = st.secrets["MYSQL_PASSWORD"]
+            aws_port = int(st.secrets["MYSQL_PORT"])
+        except KeyError:
+            aws_host = os.getenv("MYSQL_HOST")
+            aws_db = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
+            aws_user = os.getenv("MYSQL_USER")
+            aws_pass = os.getenv("MYSQL_PASSWORD")
+            aws_port = int(os.getenv("MYSQL_PORT", 3306))
+        
+        # Quick connection to get latest timestamp
+        conn = mysql.connector.connect(
+            host=aws_host,
+            port=aws_port,
+            user=aws_user,
+            password=aws_pass,
+            database=aws_db,
+            connection_timeout=5
+        )
+        
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(ReceivedAt) FROM sales_data")
+        latest_timestamp = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        
+        return latest_timestamp
+    except Exception as e:
+        st.warning(f"Could not check for new data: {e}")
+        return None
+
+@st.cache_data(ttl=600)  # Cache for 10 minutes
+def get_data_hash(start_date, end_date):
+    """Generate a hash of current data parameters and latest timestamp for cache invalidation."""
+    latest_timestamp = get_latest_data_timestamp()
+    if latest_timestamp:
+        # Create hash from date range and latest timestamp
+        hash_input = f"{start_date}_{end_date}_{latest_timestamp}"
+        return hashlib.md5(hash_input.encode()).hexdigest()
+    return None
+
+@st.cache_data(ttl=600, show_spinner="🔄 Loading fresh data from MySQL...")  # Cache for 10 minutes
+def _load_data_with_hash(data_hash, start_date=None, end_date=None, days_back=7, max_retries=3):
+    """
+    Internal function to load data with hash-based caching.
+    The hash parameter ensures cache invalidation when new data is available.
+    """
+    return _fetch_data_from_mysql(start_date, end_date, days_back, max_retries)
+
 def load_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retries=3):
     """
-    Load sales data from MySQL with retry logic and caching.
+    Load sales data from MySQL with intelligent 10-minute caching.
+    Checks for new data every 10 minutes and only reloads if new data is available.
+    
+    Args:
+        start_date: Start date for data range (date object)
+        end_date: End date for data range (date object)
+        days_back: Number of days of data to fetch (fallback if dates not provided)
+        max_retries: Maximum number of connection retry attempts
+        
+    Returns:
+        DataFrame with sales data or empty DataFrame on error
+    """
+    # Get current data hash (includes latest timestamp)
+    current_hash = get_data_hash(start_date, end_date)
+    
+    if current_hash:
+        # Use hash-based caching - will only reload if hash changes (new data available)
+        with st.spinner("🔍 Checking for new data..."):
+            data = _load_data_with_hash(current_hash, start_date, end_date, days_back, max_retries)
+            
+            # Show cache status
+            latest_timestamp = get_latest_data_timestamp()
+            if latest_timestamp and not data.empty:
+                cache_info = st.container()
+                with cache_info:
+                    col1, col2, col3 = st.columns([2, 2, 1])
+                    with col1:
+                        st.success(f"📊 **Data Status**: Using intelligent cache (10-min refresh)")
+                    with col2:
+                        st.info(f"🕐 **Latest Data**: {latest_timestamp}")
+                    with col3:
+                        if st.button("🔄 Force Refresh"):
+                            st.cache_data.clear()
+                            st.rerun()
+            
+            return data
+    else:
+        # Fallback to direct loading if hash generation fails
+        st.warning("⚠️ Cache check failed, loading data directly")
+        return _fetch_data_from_mysql(start_date, end_date, days_back, max_retries)
+
+def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retries=3):
+    """
+    Internal function to actually fetch data from MySQL.
     
     Args:
         start_date: Start date for data range (date object)
@@ -3012,12 +3112,91 @@ def main():
             st.write("### Data Preview")
             st.dataframe(filtered_df.head(20), use_container_width=True)
 
-        # 7. Shady's Command Center Tab (Pivot Table)
+        # 7. Shady's Command Center Tab (Pivot Table Only)
         with tabs[6]:
-            # Shady's Command Center Tab (Pivot Table + Custom Prediction)
             st.header("🎮 Shady's Command Center")
+            st.info("📊 Advanced pivot table analysis for comprehensive data insights.")
             
-            # --- Time-Synchronized Two-Day Pivot Table Comparison ---
+            # Show current data range for context
+            if 'Date' in filtered_df.columns:
+                unique_dates = sorted(filtered_df['Date'].unique())
+                if len(unique_dates) >= 1:
+                    date_range = f"{unique_dates[0]} to {unique_dates[-1]}"
+                    st.write(f"**Data Range:** {date_range} ({len(unique_dates)} days)")
+            
+            # --- Pivot Table Analysis ---
+            try:
+                create_pivot_table_analysis(filtered_df)
+            except Exception as e:
+                st.error(f"Error in pivot table analysis: {str(e)}")
+
+        # 8. Period Comparison Tab
+        with tabs[7]:
+            st.header("📅 Period Comparison")
+            
+            # --- Simple Period-over-Period Comparison ---
+            st.subheader("🔍 Period-over-Period Comparison")
+            if 'Date' in filtered_df.columns:
+                # Allow user to select two periods (date ranges)
+                unique_dates = sorted(filtered_df['Date'].unique())
+                if len(unique_dates) >= 2:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0)
+                    with col2:
+                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0)
+                    
+                    df1 = filtered_df[filtered_df['Date'] == period1]
+                    df2 = filtered_df[filtered_df['Date'] == period2]
+                    
+                    # Key metrics to compare
+                    metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
+                    available_metrics = [col for col in metrics if col in filtered_df.columns]
+                    
+                    if available_metrics:
+                        summary1 = df1[available_metrics].sum(numeric_only=True)
+                        summary2 = df2[available_metrics].sum(numeric_only=True)
+                        diff = summary2 - summary1
+                        
+                        comp_df = pd.DataFrame({
+                            f'{period1}': summary1,
+                            f'{period2}': summary2,
+                            'Δ (Second - First)': diff
+                        })
+                        
+                        st.write("#### Key Metrics Comparison")
+                        st.dataframe(comp_df.round(2))
+                        
+                        # Visualize
+                        if 'net_sale' in available_metrics:
+                            st.write("#### Net Sales Comparison")
+                            st.bar_chart(pd.DataFrame({
+                                'Net Sale': [summary1['net_sale'], summary2['net_sale']]
+                            }, index=[str(period1), str(period2)]))
+                        
+                        # Insights
+                        st.markdown("### 💡 Period Comparison Insights")
+                        if 'net_sale' in available_metrics:
+                            if diff['net_sale'] > 0:
+                                st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
+                            else:
+                                st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
+                        
+                        if 'Profit_Margin' in available_metrics and diff['Profit_Margin'] < 0:
+                            st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
+                        
+                        if 'Calculated_Discount' in available_metrics and diff['Calculated_Discount'] > 0:
+                            st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
+                        
+                        st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
+                    else:
+                        st.warning("⚠️ Required metrics columns not found for comparison.")
+                else:
+                    st.info("Not enough unique dates for period comparison.")
+            else:
+                st.info("Date column not found for period comparison.")
+            
+            # Time-synchronized two-day comparison analysis
             st.subheader("🔄 Time-Synchronized Two-Day Pivot Table Comparison")
             st.info("📊 This analysis compares the latest two days with precise time synchronization for accurate pivot table analysis.")
             
@@ -3305,15 +3484,6 @@ def main():
             else:
                 st.warning("⚠️ Date and ReceivedAt columns required for time-synchronized analysis.")
             
-            # --- Existing Pivot Table Analysis (Preserved) ---
-            st.markdown("---")
-            st.header("Pivot Table Analysis")
-            try:
-                create_pivot_table_analysis(filtered_df)
-            except Exception as e:
-                st.error(f"Error in pivot table analysis: {str(e)}")
-
-        # 8. Period Comparison Tab
         with tabs[7]:
             st.header("📅 Period Comparison")
             
@@ -3385,7 +3555,6 @@ def main():
 
         # 9. Data Overview Tab
         with tabs[8]:
-            # Data Overview Tab
             st.header("📋 Data Overview")
             st.write("### Data Columns and Types")
             st.dataframe(filtered_df.dtypes.reset_index().rename(columns={0: 'dtype', 'index': 'column'}))
@@ -3394,9 +3563,8 @@ def main():
             st.write("### Data Summary")
             st.dataframe(filtered_df.describe(include='all').T)
 
-        # 9. Data Quality Tab
-        with tabs[8]:
-            # Data Quality Tab
+        # 10. Data Quality Tab
+        with tabs[9]:
             st.header("🧹 Data Quality")
             st.write("### Missing Values by Column")
             st.dataframe(filtered_df.isnull().sum().reset_index().rename(columns={0: 'missing', 'index': 'column'}))
@@ -3410,21 +3578,21 @@ def main():
             st.write("### Data Preview")
             st.dataframe(filtered_df.head(20), use_container_width=True)
 
-        # 10. Customer Lifetime Value Tab
+        # 11. Customer Lifetime Value Tab
         with tabs[10]:
             if ADVANCED_ANALYTICS_AVAILABLE:
                 display_clv_analysis(filtered_df)
             else:
                 st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
 
-        # 11. Churn Prediction Tab  
+        # 12. Churn Prediction Tab  
         with tabs[11]:
             if ADVANCED_ANALYTICS_AVAILABLE:
                 display_churn_prediction(filtered_df)
             else:
                 st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
 
-        # 12. RFM Analysis Tab
+        # 13. RFM Analysis Tab
         with tabs[12]:
             if ADVANCED_ANALYTICS_AVAILABLE:
                 display_rfm_analysis(filtered_df)
