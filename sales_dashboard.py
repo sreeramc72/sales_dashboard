@@ -118,6 +118,7 @@ import time
 import warnings
 import logging
 import pathlib
+import hashlib
 
 # --- Third-party imports ---
 import pandas as pd
