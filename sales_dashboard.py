@@ -1,5 +1,6 @@
 # --- UI Changes Block ---
 # Custom Streamlit UI tweaks for dashboard appearance
+import streamlit as st
 st.markdown("""
 <style>
     /* Main header styling */
