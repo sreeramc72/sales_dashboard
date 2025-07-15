@@ -1,3 +1,49 @@
+# --- UI Changes Block ---
+# Custom Streamlit UI tweaks for dashboard appearance
+st.markdown("""
+<style>
+    /* Main header styling */
+    .main-header {
+        font-size: 3rem;
+        font-weight: bold;
+        color: #1f77b4;
+        text-align: center;
+        margin-bottom: 2rem;
+    }
+    /* Section header styling */
+    .section-header {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #2c3e50;
+        margin-top: 2rem;
+        margin-bottom: 1rem;
+    }
+    /* Metric card styling */
+    .metric-card {
+        background-color: #f0f2f6;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        border-left: 5px solid #1f77b4;
+        margin-bottom: 1rem;
+    }
+    /* Make all tables horizontally scrollable and readable */
+    div[data-testid="stHorizontalBlock"] table {
+        word-break: break-word;
+        min-width: 1200px;
+        font-size: 1.05em;
+    }
+    div[data-testid="stHorizontalBlock"] th, div[data-testid="stHorizontalBlock"] td {
+        padding: 6px 10px;
+    }
+    /* Make all markdown tables scrollable */
+    .scrollable-table {
+        overflow-x: auto;
+        margin-bottom: 1em;
+    }
+    /* Hide Streamlit default footer */
+    footer {visibility: hidden;}
+</style>
+""", unsafe_allow_html=True)
 # --- AWS MySQL Connection Test Utility ---
 def test_aws_mysql_connection():
     import os
@@ -21,8 +67,6 @@ def test_aws_mysql_connection():
 
 import os
 import streamlit as st
-from datetime import datetime, timezone, timedelta
-import pytz
 
 # --- Third-party imports (for AWS MySQL helper) ---
 from sqlalchemy import create_engine, text
@@ -44,24 +88,35 @@ def get_aws_mysql_engine(endpoint, db_name, username, password, port=3306):
 
 # ...existing code...
 
-# --- AWS MySQL Default Configuration ---
-# Automatically use AWS MySQL from Streamlit secrets
-try:
-    # Use AWS MySQL credentials from Streamlit secrets by default
+# --- Data Source Selection ---
+
+# Add a button to test AWS MySQL connection using .env credentials
+if st.sidebar.button("Test AWS MySQL Connection (.env)"):
+    test_aws_mysql_connection()
+
+st.sidebar.header("Data Source Selection")
+data_source = st.sidebar.selectbox(
+    "Choose Data Source:",
+    ["Local MySQL", "AWS MySQL"],
+    index=1  # AWS MySQL is default
+)
+
+if data_source == "Local MySQL":
+    st.sidebar.success("Using Local MySQL (from .env)")
+    db_host = os.getenv("MYSQL_HOST")
+    db_name = os.getenv("MYSQL_DATABASE")
+    db_user = os.getenv("MYSQL_USER")
+    db_pass = os.getenv("MYSQL_PASSWORD")
+    db_port = int(os.getenv("MYSQL_PORT") or 3306)
+else:
+    st.sidebar.success("Using AWS MySQL (from st.secrets)")
     db_host = st.secrets["MYSQL_HOST"]
     db_name = st.secrets["MYSQL_DB"]
     db_user = st.secrets["MYSQL_USER"]
     db_pass = st.secrets["MYSQL_PASSWORD"]
     db_port = int(st.secrets["MYSQL_PORT"])
-except KeyError:
-    # Fallback to environment variables if secrets not available
-    db_host = os.getenv("MYSQL_HOST")
-    db_name = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
-    db_user = os.getenv("MYSQL_USER")
-    db_pass = os.getenv("MYSQL_PASSWORD")
-    db_port = int(os.getenv("MYSQL_PORT") or 3306)
 
-# Create AWS MySQL engine for all database operations
+# Create a single engine for all database operations
 engine = get_aws_mysql_engine(
     endpoint=db_host,
     db_name=db_name,
@@ -69,6 +124,7 @@ engine = get_aws_mysql_engine(
     password=db_pass,
     port=db_port
 )
+# Use 'engine' for all database operations below
 import sqlalchemy
 import pandas as pd
 from sqlalchemy.engine import URL
@@ -97,13 +153,6 @@ def get_aws_mysql_engine(endpoint, db_name, username, password, port=3306):
     # BigQuery loader and debug UI removed as per user request
 from deep_dive_discount_performance_insights import deep_dive_discount_performance_insights
 
-# Advanced analytics import
-try:
-    from advanced_analytics import display_clv_analysis, display_churn_prediction, display_rfm_analysis
-    ADVANCED_ANALYTICS_AVAILABLE = True
-except ImportError:
-    ADVANCED_ANALYTICS_AVAILABLE = False
-
 # --- Standard library imports ---
 
 # --- Utility: Sanitize DataFrame for Streamlit Arrow compatibility ---
@@ -120,7 +169,6 @@ import time
 import warnings
 import logging
 import pathlib
-import hashlib
 
 # --- Third-party imports ---
 import pandas as pd
@@ -219,7 +267,7 @@ def add_essential_calculated_columns(df):
         DISCOUNT_NAME_TO_GROUP = {
             # Staff Meals & Others (updated list)
             'Total Discount (Staff Meals & Others)': [
-                '10% - Corporate Discount','10% - Esaad Discount','10% Discount - AL BANDAR & ETIHAD STAFF','10% Loyal Customer','100 % Marketing','100 % staff Meal','100 AED - Voucher','100 AED GIFT VOUCHER','100 AED VOUCHER','100 Aed Voucher Discount','100% - Area Manager Discount','100% - Branch Complaint','100% - Branch Mistake','100% - Customer Care Discount','100% - Growth Discount','100% - Manager\'s Discount','100% - Marketing Discount','100% - Staff Meal Discount','100% - Training Discount','100% ACAI LUV','100% agent mistake','100% FOOD TASTING','100% Growth Discount','100% Growth\'s Discount','100% influencer discount','100% Manager\'s Discount','100% Managers Meal','100% Marketing','100% Marketing Aggregator Meal','100% marketing discount','100% Marketing Influencer','100% QSA','100% QSA DISCOUNT','100% Shi Meshwi Staff Meal','100% SOUP LUV','100% Staff Meal','100% Taste Panel Discount','100% Tawookji Managers Meal','100% Training Discount','100% Training Meal Discount','15% - Corporate Discount','15% Corporate Deal','150 AED - Gift Voucher','150 AED - Voucher','150 AED GIFT VOUCHER','20% - Corporate Discount','20% - Esaad Discount','20% - Mall Staff Discount','20% Corporate Discount','20% Corporate Order','20% Staff Meal','25% corporate','25% OFF - Sister Company/Hamper Discount','2nd Meal on Duty','30 % Essaad Corporate Discount','30% - Coalyard','30% - Coalyard Cafe','30% - discount','30% - Hokania Cafe','30% - Hookania Discount','30% OFF Hokania Cafe','30% OFF Hookania Cafe','30% Coalyard Cafe','30% OFF Padel Pro','30% Staff Meal','300 AED - VOUCHER','40% Social Brewer','5% Corporate Discount','50 % Discount Head office','50% Agent Mistake','50% OFF Sustainabilty Discount','50% Shi Meshwi Lava Brands','50% Shi Meshwi Staff Discount','70 % Top Management','70 HO Meal','70% - Staff Meal Discount','70% Mighty Slider Discount','70% Staff Meal','70% Tabkhet Salma Staff Meal','70% Tawookji Staff','70% Top Management','ACAI LUV QSA 100%','ADCB','ADNOC','AED','Agent Mistake','Agent Mistake Discount (100%)','Al Saada','Albandar & Etihad','Area Manager Discount','Area Manager Discount!','Bagel Luv 100% Training','Bagel Luv QSA 100%','BC60','Branch Complaint','Branch Complaint 100%','Cakery Staff Discount 40%','cancelled orders bad weather 100%','Chinese New Year 25%','Coal yard cafe Discount 30%','Coalyard 30%','Corporate - 20% discount','corporate 10%','Corporate 10% Discount','Corporate 15%','Corporate 15% Discount','Corporate 20%','Corporate 20% Discount','Corporate 20% Off','Corporate 20%Discount','Corporate 25% Discount','Corporate 30% Discount','corporate 40 %','Corporate Deals - 20% Discount','Corporate Discount - 20%','Corporate Discount - 25%','Corporate Orders','Corporate Orders 20%','Corporate Orders 25%','Corporate Orders 30%','Customer Care','Customer Care - 100%','Customer care 100% discount','customer care 50%','Emaar Group Employees Discount - 15%','Emirates Platinum - 25% Discount','Esaad','Esaad Discount 20%','FOMO QSA 100%','Growth - 100% Discount','HO Friday Meal','HO Friday Meal 100% discount','HO Meal','HO Meal 70% Discount','Hookania - 30% discount','Influencer 100%','lava brands','Lava Discount - 50%','Lava Discount 50%','Mall Staff','Mall Staff Disco','Manager Meal on Duty','Manager Meal On Duty 100%','Manager on duty meal 100% discount','Manager\'s Meal - 100 % Discount','Manager\'s Meal - 100% Discount','Manager\'s meal discount 100%','Marketing','Marketing - 100% discount','Marketing 100 %','Marketing 100%','Marketing 100% Discount','Off duty meal / 2nd meal on duty 30% discount','Padel Pro 30 %','promo Branch Complaint','QSA - PROMO DISCOUNT','R & I 100 % Discount','R & I Discount 100%','R&I Training 100%Discount','Social Brewer 40%','Social Brewer 45%','Social Brewer 45% discount','Staff Discount','Staff Meal 100 %','Staff meal discount','Staff Meal on Duty','Staff Meal On Duty - 100%','Staff Meal On Duty 100%','Staff on duty meal 100% discount','Staff on Duty Meal 70 %','step cafe 30% discount','Step Cafe 30% Discount 30%','step up 30%','Stuff Meal On Duty 100%','stuff meal on duty 100% Discount','Stuuf Meal on Duty 70%','Taste Panel','Taste Panel 100 %','Taste Panel 100%','Taste Panel 100% Discount','Taste Panel Discount','Test Order','TEST ORDER - 100% discount','Test order 100 %','Testing Orders','TGB Social Brewer 40%','Top Management','Top management / ho meal 70% discount','Top Management 70% Discount','Training 100% Discount','Training Department','training department 100%','Training Meal - 100% discount','Voucher - 50 AED','30% OFF Hokania Cafe','30% - Hookania Discount'
+                '10% - Corporate Discount','10% - Esaad Discount','10% Discount - AL BANDAR & ETIHAD STAFF','10% Loyal Customer','100 % Marketing','100 % staff Meal','100 AED - Voucher','100 AED GIFT VOUCHER','100 AED VOUCHER','100 Aed Voucher Discount','100% - Area Manager Discount','100% - Branch Complaint','100% - Branch Mistake','100% - Customer Care Discount','100% - Growth Discount','100% - Manager\'s Discount','100% - Marketing Discount','100% - Staff Meal Discount','100% - Training Discount','100% ACAI LUV','100% agent mistake','100% FOOD TASTING','100% Growth Discount','100% Growth\'s Discount','100% influencer discount','100% Manager\'s Discount','100% Managers Meal','100% Marketing','100% Marketing Aggregator Meal','100% marketing discount','100% Marketing Influencer','100% QSA','100% QSA DISCOUNT','100% Shi Meshwi Staff Meal','100% SOUP LUV','100% Staff Meal','100% Taste Panel Discount','100% Tawookji Managers Meal','100% Training Discount','100% Training Meal Discount','15% - Corporate Discount','15% Corporate Deal','150 AED - Gift Voucher','150 AED - Voucher','150 AED GIFT VOUCHER','20% - Corporate Discount','20% - Esaad Discount','20% - Mall Staff Discount','20% Corporate Discount','20% Corporate Order','20% Staff Meal','25% corporate','25% OFF - Sister Company/Hamper Discount','2nd Meal on Duty','30 % Essaad Corporate Discount','30% - Coalyard','30% - Coalyard Cafe','30% - discount','30% - Hokania Cafe','30% - Hookania Discount','30% OFF Hokania Cafe','30% OFF Hookania Cafe','30% Coalyard Cafe','30% OFF Padel Pro','30% Staff Meal','300 AED - VOUCHER','40% Social Brewer','5% Corporate Discount','50 % Discount Head office','50% Agent Mistake','50% OFF Sustainabilty Discount','50% Shi Meshwi Lava Brands','50% Shi Meshwi Staff Discount','70 % Top Management','70 HO Meal','70% - Staff Meal Discount','70% Mighty Slider Discount','70% Staff Meal','70% Tabkhet Salma Staff Meal','70% Tawookji Staff','70% Top Management','ACAI LUV QSA 100%','ADCB','ADNOC','AED','Agent Mistake','Agent Mistake Discount (100%)','Al Saada','Albandar & Etihad','Area Manager Discount','Area Manager Discount!','Bagel Luv 100% Training','Bagel Luv QSA 100%','BC60','Branch Complaint','Branch Complaint 100%','Cakery Staff Discount 40%','cancelled orders bad weather 100%','Chinese New Year 25%','Coal yard cafe Discount 30%','Coalyard 30%','Corporate - 20% discount','corporate 10%','Corporate 10% Discount','Corporate 15%','Corporate 15% Discount','Corporate 20%','Corporate 20% Discount','Corporate 20% Off','Corporate 20%Discount','Corporate 25% Discount','Corporate 30% Discount','corporate 40 %','Corporate Deals - 20% Discount','Corporate Discount - 20%','Corporate Discount - 25%','Corporate Orders','Corporate Orders 20%','Corporate Orders 25%','Corporate Orders 30%','Customer Care','Customer Care - 100%','Customer care 100% discount','customer care 50%','Emaar Group Employees Discount - 15%','Emirates Platinum - 25% Discount','Esaad','Esaad Discount 20%','FOMO QSA 100%','Growth - 100% Discount','HO Friday Meal','HO Friday Meal 100% discount','HO Meal','HO Meal 70% Discount','Hookania - 30% discount','Influencer 100%','lava brands','Lava Discount - 50%','Lava Discount 50%','Mall Staff','Mall Staff Disco','Manager Meal on Duty','Manager Meal On Duty 100%','Manager on duty meal 100% discount','Manager\'s Meal - 100 % Discount','Manager\'s Meal - 100% Discount','Manager\'s meal discount 100%','Marketing','Marketing - 100% discount','Marketing 100 %','Marketing 100%','Marketing 100% Discount','Off duty meal / 2nd meal on duty 30% discount','Padel Pro 30 %','promo Branch Complaint','QSA - PROMO DISCOUNT','R & I 100 % Discount','R & I Discount 100%','R&I Training 100%Discount','Social Brewer 40%','Social Brewer 45%','Social Brewer 45% discount','Staff Discount','Staff Meal 100 %','Staff meal discount','Staff Meal on Duty','Staff Meal On Duty - 100%','Staff Meal On Duty 100%','Staff on duty meal 100% discount','Staff on Duty Meal 70 %','step cafe 30% discount','Step Cafe 30% Discount 30%','step up 30%','Stuff Meal On Duty 100%','stuff meal on duty 100% Discount','Stuuf Meal on Duty 70%','Taste Panel','Taste Panel 100 %','Taste Panel 100%','Taste Panel 100% Discount','Taste Panel Discount','Test Order','TEST ORDER - 100% discount','Test order 100 %','Testing Orders','TGB Social Brewer 40%','Top Management','Top management / ho meal 70% discount','Top Management 70% Discount','Training 100% Discount','Training Department','training department 100%','Training Meal - 100% discount','Voucher - 50 AED','30% OFF Hokania Cafe','30% - Hookania Discount','Discount','Discount | Discount','Discount | Discount | Discount','Discount | Discount | Discount | Discount','Discount | Talabat_Gem','Discount - 100%','Discount - 15%','Discount - 20%','Discount - 25%','Discount - 30%','Discount - 50%','Discount - 70%','Discount Code Grouping',
             ],
             'Total Discount (Agg)': [
                 '20158','26791','613627','625628','650060','654701','662535','10 % OFF','10% Talabat DineOut','10452sqkm','10AED off - talabat Rewards','15 % OFF','15 % OFF | PICKUP50','15 % OFF | SMILES30','15 % OFF | SMILES50','15% - Zomato Pro Discount','15% Talabat DineOut','15BCF','15BCG','15BFF','15CAKE','15CARI','15RAMADAN','20 % OFF','20 % OFF | COMBO100','20 % OFF | FLAT20','20 % OFF | HUNGRY30','20 % OFF | Item Level discount','20 % OFF | PICKUP50','20 % OFF | SMILES30','20 % OFF | SMILES50','20 % OFF | SMILES50 | Item Level discount','20 % OFF | WEEKEND50','20 % OFF | WEEKEND50 | Item Level discount','20EFT','20FEAST','20FEASTT','20FTU','20HLT','20KAY','20LUV','20MAN','20MSP','20YOU','20ZBT','25 % OFF','25 % OFF | COMBO100','25 % OFF | FLAT20','25 % OFF | HOMEFEAST','25 % OFF | HOTDEAL','25 % OFF | HUNGRY30','25 % OFF | Item Level discount','25 % OFF | PICKUP50','25 % OFF | PICKUP50 | Item Level discount','25 % OFF | SMILES30','25 % OFF | SMILES50','25 % OFF | SMILES50 | Item Level discount','25 % OFF | SMILES60','25 % OFF | SUPER30','25 % OFF | WEEKEND50','25% Discount','25% Discount - Entertainer','25BBK','25BGT','25EFT','25EPB','25FTU','25HSP','25KAY','25OBG','25PTC','25PTR','25TFT','25WPP','25WRP','25ZBT','30 % OFF','30 % OFF | BTS50','30 % OFF | COMBO100','30 % OFF | FLAT20','30 % OFF | HUNGRY30','30 % OFF | Item Level discount','30 % OFF | PICKUP50','30 % OFF | SMILES30','30 % OFF | SMILES50','30 AED - Careem','30% - Smiles Discount','30% - Zomato Discount','30% Careem Dine Out','30% Discount Deliveroo','30% off','30CR','30EHN','30EPB','30EVERY','30FAVES','30FTU','30HL','30SSR','30TGB','35 % OFF','35 % OFF | HUNGRY30','35 % OFF | PICKUP50','35 % OFF | SMILES30','40 % OFF','40 % OFF | SMILES30','50 % OFF','50 % OFF | PICKUP50','50 % OFF | SMILES50','50 % OFF | SUPER10','50% Lava Discount','50CWK','50DW','50PBT','50PNP','AC25','ACAI20','ADIB50','AL20','AL30','ALV20','ANX40','ASB50','ASIAN20','ASR30','AUS 15% discount','BA35','BAG20','BAK25','BAKE30','BB25','BBC20','BBK15','BBK25','BEM20','BFE20','BFE25','BFR25','BGL25','BIRD30','BL20','BL25','BM30','BMT20','BMT25','BNS30','BOGO','BOGO ENTERTAINER','BOGO20','BREAKFAST30','BURGER20','C50','CAKE15','CAKE20','CAKE50','CAKERY15','Cakery50','Careem - 10% Flat Discount','Careem - 10% MOV 20 Cap 30','Careem - 20% Discount','Careem - 20% Flat Discount','Careem - 20% MOV 20 Cap 30','Careem - 25% Discount','Careem - 25% Flat Discount','Careem - 25% MOV 20 Cap 30','Careem - 30% Discount','Careem - 30% Flat Discount','Careem - 40% Flat Discount','Careem - 50% MOV 40 Cap 30','Careem - 50% MOV40 Max AED30','Careem 20%','Careem 25%','Careem 30%','Careem 40%','Careem 50%','Careem Cap 30','CB100','CB50','Chain 630486','CHEEKY20','CHEEKY25','CKM20','CMG10','CO30','COFFEE30','COMBO100','COMBO100 | Item Level discount','CP50','CUP20','CUPP20','DAY10','DAY20','DAYY20','Deliveroo 20%','Deliveroo 20% Discount','Deliveroo 30 AED','Deliveroo Cap 40','dis_50','Disc_%20','Disc_10','Disc_15','Disc_20','Disc_20%','Disc_25','Disc_30','Disc_30 | Talabat_Gem','Disc_35','Disc_35%','Disc_40','Disc_50','Disc_50 | Talabat_Gem','Disc_52','Discount','Discount | Disc_52','Discount | Discount','Discount | Discount | Discount','Discount | Discount | Discount | Discount | Discount','DRM20','EAT20','EatEasy 20%','EatEasy 25%','EatEasy 30%','EatEasy 35%','EatEasy 40%','EATT20','EB25','EBK20','EFT20','EID50','EIDIYA','EL30','ELB30','Entertainer - 25%','Entertainer - BOGO','Entertainer 25%','Entertainer BOGO','Entertainer Offer','FAB15','FAR25','FAST50','FATA20','FATA25','FAYSAL20','FAZAA20','FB20','FB25','FCH25','FCH30','FEAST','FEAST10','FEAST20','FERN15','FERN20','FERN25','FERN35','FGR25','FIRST50','FIRSTBITE','FKT25','FLASH50','flat 30%','FLAT20','FLAT20 | Item Level discount','FMB20','FOMO20','FOMO25','FOMO30','FOMO50','FORYOU20','FORYOU50','FRIED30','FT35','FT50','FTU25','FTY20','GB30','GOCARI','Good Day','Good Day - BOGO','GOOD25','GOTYOU','GOTYOU.','HALFDEAL','HB25','HB30','HEA50','HERO50','HL30','HLT20','HOMEFEAST','HOMEFEAST | Item Level discount','HOTDEAL','HPK50ED','HUB15','HUNGRY30','IGET25','IKP25','Instashop - 20% Discount','Instashop - 20% Flat Discount','Instashop - 30% Flat Discount','Instashop - 35% Flat Discount','Instashop - 40% Flat Discount','Instashop 20%','Instashop 25%','Instashop 30%','Instashop 35%','Instashop 40%','Item Level discount','K20','KAAYK20','KAY10','KAY15','KAY20','KAY25','KAY30','KAY50','KAYK20','KAYK25','KAYK35','KAYK50','KAYKROO25','KAYY50','KB20','KB25','KBF25','KFP20','KK15','KK20','KK25','KK30','KK35','KK40','KK50','KKK50','KKRO20','KL20','KL30','KO20','KR25','KRO10','KRON20','LUV20','LUV25','MACHU20','MAN20','MANN20','MANO20','MANOUSHE50','MAQLUBA','MESH25','MESH30','MESHAWI50','MIGHT20','MNS10','MOUSSAKA','MS10','MS20','MS25','MSC10','MSC20','MSF25','MSP10','MSS20','MST10','MST20','MSTREET25','MSTT10','MSTT20','MTS10','NBD20','NEW30','NEW50','NEWCARI','NOON - 20% Flat Discount','NOON - 25% Flat Discount','NOON - 30% Flat Discount','NOON - 40% Flat Discount','Noon 20%','Noon 25%','Noon 30%','NOON 30% Discount - MOV 30 - Cap 20','Noon 40%','Noon 50%','NOON 50% Discount - MOV 30 - Cap 20','Noon Cap 20','NOT_MAPPED','NOT_MAPPED | 10AED off - talabat Rewards','NOT_MAPPED | Discount','NOT_MAPPED | Talabat_Gem','NS25','NU30','NU35','NU50','OBG30','OFF20','OFO6VYL2P','PASTA25','PASTA30','PASTA35','PB50','PC50','PICK40','PICK50','PICKN','PICKN50','PICKUP50','PICKUP50 | Item Level discount','PLUS20','PLUS25','PLUS30','PLUSMONDAY20','PLUSMONDAY20M','PLUSMONDAY30','PLUSMONDAY30DH','PNP50','POS_25','PPAIR50','PROMOTION','PROMOTION | 15CARI','PROMOTION | ADFOOD25','PROMOTION | CARIGO1','PROMOTION | CB50','PROMOTION | FAZAA20','PROMOTION | GET15AED','PROMOTION | YAHYA25','PROMOTION | ZNK10','PTR20','RAM20','RAMADAN20','Restaurant Discount','RNEW25','ROO25','RSB20','SA20','SAF20','SALUV25','SANDWICH20','SANDWICH25','SAUCE25','SAUCY50','SAVEU20','SAVUU20','SB15','SB25','SB50','SBT25','SCT15','SCUP20','SFIHA','SHI25','SHIM30','SHIME30','SLURP20','SLURP25','Smiles','SMILES30','SMILES30 | Item Level discount','SMILES50','SMILES50 | Item Level discount','SMILES60','SOC25','SOCIETY30','SOP20','SOP25','SOUL15','SOUP20','SOUP25','SOUP30','SP25','SP30','SPANAKOPITA','SPW30','SPZ15','string','string | string','string | string | string','string | string | string | string','STZ25','SUPER30','SURE50','SUSURU35','SWEET20','T30','TAKE20','TAKE25','Talabat - 20% Churned Discount - Cap 30','Talabat - 20% discount','Talabat - 20% discount, Cap 30aed','Talabat - 20% Flat Discount','Talabat - 20% New Customer Discount','Talabat - 20% New Customer Discount - Cap 30','Talabat - 25% discount','Talabat - 25% Flat Discount','Talabat - 30% discount','Talabat - 30% discount, Cap 30aed','Talabat - 30% Flat Discount','Talabat - 30% New Customer Discount','Talabat - 30% New Customer Discount, Cap 30','Talabat - 35% discount','Talabat - 35% Flat Discount','Talabat - 40% Flat Discount','Talabat - 50% discount, cap 30aed','Talabat - 50% Flash Sale, Cap 30aed','Talabat - Super Saver - 50% Discount, Cap 30','Talabat 15%','Talabat 20%','Talabat 20% Discount','Talabat 20% off','Talabat 25%','Talabat 30%','talabat 30%off','Talabat 35%','talabat 35% Discount','Talabat 40%','talabat 50%','Talabat Cap 30','Talabat Pro 15%','Talabat Regular 10%','Talabat_Gem','Talabat_Gem | Disc_50','Talabat_Gem | Disc_52','Talabna - 20% Discount','TGB25','TOULIN','TPB20','TPB25','TPC15','TPC20','TSBL50','TTF20','TTF25','TTZ20','UAE52','WEEKEND50','WEEKEND50 | Item Level discount','WFB25','WP20','WP25','WPD20','WPP20','WRA10','WRA20','WRAP20','WRAPP20','WRAPPED20','WRAPPED25','WRP10','WRP20','WRR50','WTC15','WTC25','WTC30','YAL10','YALLA10','YOURS20','YUM20','YUM25','YUM30','YUMMY30','ZATAAR25','Zomato Pro','2025-02-20'
@@ -401,115 +449,12 @@ def add_calculated_columns(df):
     
     return df
 
-# --- Intelligent Caching System ---
-@st.cache_data(ttl=60)  # Cache for 1 minute to ensure fresh data detection
-def get_latest_data_timestamp():
-    """Get the latest ReceivedAt timestamp from MySQL to check for new data."""
-    try:
-        # Get AWS MySQL credentials
-        try:
-            aws_host = st.secrets["MYSQL_HOST"]
-            aws_db = st.secrets["MYSQL_DB"]
-            aws_user = st.secrets["MYSQL_USER"]
-            aws_pass = st.secrets["MYSQL_PASSWORD"]
-            aws_port = int(st.secrets["MYSQL_PORT"])
-        except KeyError:
-            aws_host = os.getenv("MYSQL_HOST")
-            aws_db = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
-            aws_user = os.getenv("MYSQL_USER")
-            aws_pass = os.getenv("MYSQL_PASSWORD")
-            aws_port = int(os.getenv("MYSQL_PORT", 3306))
-        
-        # Quick connection to get latest timestamp
-        conn = mysql.connector.connect(
-            host=aws_host,
-            port=aws_port,
-            user=aws_user,
-            password=aws_pass,
-            database=aws_db,
-            connection_timeout=5
-        )
-        
-        cursor = conn.cursor()
-        cursor.execute("SELECT MAX(ReceivedAt) FROM sales_data")
-        latest_timestamp = cursor.fetchone()[0]
-        cursor.close()
-        conn.close()
-        
-        return latest_timestamp
-    except Exception as e:
-        st.warning(f"Could not check for new data: {e}")
-        return None
-
-@st.cache_data(ttl=60)  # Cache for 1 minute to ensure fresh data detection
-def get_data_hash(start_date, end_date):
-    """Generate a hash of current data parameters and latest timestamp for cache invalidation."""
-    latest_timestamp = get_latest_data_timestamp()
-    if latest_timestamp:
-        # Create hash from date range and latest timestamp
-        hash_input = f"{start_date}_{end_date}_{latest_timestamp}"
-        return hashlib.md5(hash_input.encode()).hexdigest()
-    return None
-
-@st.cache_data(ttl=120, show_spinner="🔄 Loading fresh data from MySQL...")  # Cache for 2 minutes to ensure fresh data
-def _load_data_with_hash(data_hash, start_date=None, end_date=None, days_back=7, max_retries=3):
-    """
-    Internal function to load data with hash-based caching.
-    The hash parameter ensures cache invalidation when new data is available.
-    """
-    return _fetch_data_from_mysql(start_date, end_date, days_back, max_retries)
-
-def load_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retries=3):
-    """
-    Load sales data from MySQL with intelligent 10-minute caching.
-    Checks for new data every 10 minutes and only reloads if new data is available.
+@st.cache_data(ttl=3600)  # Cache for 1 hour (increased from 5 minutes)
+def load_data_from_mysql(days_back=7, max_retries=3):
+    """Load data from MySQL database with optimized query for better performance
     
     Args:
-        start_date: Start date for data range (date object)
-        end_date: End date for data range (date object)
-        days_back: Number of days of data to fetch (fallback if dates not provided)
-        max_retries: Maximum number of connection retry attempts
-        
-    Returns:
-        DataFrame with sales data or empty DataFrame on error
-    """
-    # Get current data hash (includes latest timestamp)
-    current_hash = get_data_hash(start_date, end_date)
-    
-    if current_hash:
-        # Use hash-based caching - will only reload if hash changes (new data available)
-        with st.spinner("🔍 Checking for new data..."):
-            data = _load_data_with_hash(current_hash, start_date, end_date, days_back, max_retries)
-            
-            # Show cache status
-            latest_timestamp = get_latest_data_timestamp()
-            if latest_timestamp and not data.empty:
-                cache_info = st.container()
-                with cache_info:
-                    col1, col2, col3 = st.columns([2, 2, 1])
-                    with col1:
-                        st.success(f"📊 **Data Status**: Using intelligent cache (10-min refresh)")
-                    with col2:
-                        st.info(f"🕐 **Latest Data**: {latest_timestamp}")
-                    with col3:
-                        if st.button("🔄 Force Refresh"):
-                            st.cache_data.clear()
-                            st.rerun()
-            
-            return data
-    else:
-        # Fallback to direct loading if hash generation fails
-        st.warning("⚠️ Cache check failed, loading data directly")
-        return _fetch_data_from_mysql(start_date, end_date, days_back, max_retries)
-
-def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retries=3):
-    """
-    Internal function to actually fetch data from MySQL.
-    
-    Args:
-        start_date: Start date for data range (date object)
-        end_date: End date for data range (date object)
-        days_back: Number of days of data to fetch (fallback if dates not provided)
+        days_back: Number of days of data to fetch
         max_retries: Maximum number of connection retry attempts
         
     Returns:
@@ -526,87 +471,32 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
             # Show loading indicator with retry information if applicable
             retry_msg = f" (Attempt {retry_count + 1}/{max_retries})" if retry_count > 0 else ""
             with st.spinner(f"🔄 Loading data from MySQL for last {days_back} days{retry_msg}..."):
-                # Get AWS MySQL credentials from Streamlit secrets
-                try:
-                    aws_host = st.secrets["MYSQL_HOST"]
-                    aws_db = st.secrets["MYSQL_DB"]
-                    aws_user = st.secrets["MYSQL_USER"]
-                    aws_pass = st.secrets["MYSQL_PASSWORD"]
-                    aws_port = int(st.secrets["MYSQL_PORT"])
-                except KeyError:
-                    # Fallback to environment variables
-                    aws_host = os.getenv("MYSQL_HOST")
-                    aws_db = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
-                    aws_user = os.getenv("MYSQL_USER")
-                    aws_pass = os.getenv("MYSQL_PASSWORD")
-                    aws_port = int(os.getenv("MYSQL_PORT", 3306))
-                
-                # Log connection attempt (not exposing credentials) - minimized for cleaner UI
-                # st.info(f"Connecting to AWS MySQL database at {aws_host}:{aws_port}")
-                # Create connection with timeout using AWS MySQL credentials
+                # Log connection attempt (not exposing credentials)
+                st.info(f"Connecting to MySQL database at {os.getenv('MYSQL_HOST')}:{os.getenv('MYSQL_PORT', '3306')}")
+                # Create connection with timeout
                 conn = mysql.connector.connect(
-                    host=aws_host,
-                    port=aws_port,
-                    user=aws_user,
-                    password=aws_pass,
-                    database=aws_db,
+                    host=os.getenv("MYSQL_HOST"),
+                    port=int(os.getenv("MYSQL_PORT", 3306)),
+                    user=os.getenv("MYSQL_USER"),
+                    password=os.getenv("MYSQL_PASSWORD"),
+                    database=os.getenv("MYSQL_DATABASE"),
                     connection_timeout=connection_timeout
                 )
-                # Optimized query: Select only required columns, use UAE timezone for data loading
-                # UAE timezone is UTC+4 (Gulf Standard Time)
-                uae_tz = pytz.timezone('Asia/Dubai')
-                uae_now = datetime.now(uae_tz)
-                
-                # Get MySQL timezone info for debugging
-                cursor = conn.cursor()
-                cursor.execute("SELECT @@session.time_zone, NOW()")
-                mysql_tz, mysql_now = cursor.fetchone()
-                cursor.close()
-                
-                # Always use UAE timezone for determining 'today' and data loading
-                start_date_str = datetime.combine(datetime.strptime(str(start_date), '%Y-%m-%d').date(), datetime.min.time()).strftime('%Y-%m-%d %H:%M:%S')
-                
-                # For end date, if it's today in UAE timezone, load all available data for the present day
-                today_check = datetime.strptime(str(end_date), '%Y-%m-%d').date()
-                uae_today = uae_now.date()
-                
-                if today_check == uae_today:
-                    # For present day in UAE timezone, load ALL available data regardless of time
-                    # Use end of day to capture all data for today
-                    end_date_str = datetime.combine(uae_today, datetime.max.time()).strftime('%Y-%m-%d %H:%M:%S')
-                else:
-                    # For past dates, use end of day
-                    end_date_str = datetime.combine(datetime.strptime(str(end_date), '%Y-%m-%d').date(), datetime.max.time()).strftime('%Y-%m-%d %H:%M:%S')
-                
+                # Optimized query: Select only required columns, use WHERE clause first
                 query = f"""
                 SELECT OrderID, CustomerName, Telephone, ReceivedAt, GrossPrice, Discount, 
                        Delivery, Tips, VAT, Surcharge, Total, 
                        Channel, Brand, Location, PaymentMethod
                 FROM sales_data 
-                WHERE ReceivedAt >= '{start_date_str}' AND ReceivedAt <= '{end_date_str}'
+                WHERE ReceivedAt >= DATE_SUB(NOW(), INTERVAL {days_back} DAY)
                 ORDER BY ReceivedAt DESC
                 """
-                # Load data in chunks if it's large - minimized logging for cleaner UI
-                # st.info(f"Running query to fetch {days_back} days of sales data...")
-                # st.code(f"Query: SELECT ... FROM sales_data WHERE ReceivedAt >= DATE_SUB(NOW(), INTERVAL {days_back} DAY)")
+                # Load data in chunks if it's large
+                st.info(f"Running query to fetch {days_back} days of sales data...")
                 df = pd.read_sql(query, conn, parse_dates=['ReceivedAt'])
-                
-                # Debug information - show data range for troubleshooting
-                if df.empty:
-                    st.warning("No data returned from query - checking if table exists and has data")
-                else:
-                    # Show actual data range loaded for debugging data freshness issues
-                    latest_in_data = df['ReceivedAt'].max()
-                    earliest_in_data = df['ReceivedAt'].min()
-                    st.info(f"📊 Loaded {len(df)} records | Data range: {earliest_in_data} to {latest_in_data}")
-                    st.caption(f"Query range: {start_date_str} to {end_date_str}")
-                    # Show timezone and server info for debugging
-                    st.caption(f"🕐 MySQL timezone: {mysql_tz} | MySQL server time: {mysql_now}")
-                    st.caption(f"🇦🇪 UAE timezone: Asia/Dubai (+04:00) | UAE current time: {uae_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
                 conn.close()
-                # Log successful connection - minimized for cleaner UI
-                # Only show success message if there are issues, otherwise keep UI clean
-                # st.success(f"Successfully connected to MySQL and retrieved {len(df)} records!")
+                # Log successful connection
+                st.success(f"Successfully connected to MySQL and retrieved {len(df)} records!")
                 # Essential preprocessing only - defer other processing
                 df['Date'] = df['ReceivedAt'].dt.date
                 df['Hour'] = df['ReceivedAt'].dt.hour
@@ -1198,10 +1088,10 @@ def create_pivot_table_analysis(df):
         # Generate predictions for today
         current_date = datetime.now().date()
         
-        # Use the full filtered dataset for prediction (already filtered by date range in main function)
+        # Get historical data for prediction (last 30 days)
         if 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date'])
-            historical_data = df  # Use full filtered dataset instead of hardcoded 30-day limit
+            historical_data = df[df['Date'] >= (pd.Timestamp.now() - pd.Timedelta(days=30))]
             
             if len(historical_data) >= 7:  # Need at least a week of data
                 # Calculate daily averages for prediction
@@ -1430,8 +1320,7 @@ def create_pivot_table_analysis(df):
                 options=list(range(max_hour + 1)),
                 index=max_hour,
                 format_func=lambda x: f"Up to {x:02d}:xx ({x+1} hours)",
-                help=f"Select maximum hour to include. This will override the exact sync filter.",
-                key="hour_filter_selectbox"
+                help=f"Select maximum hour to include. This will override the exact sync filter."
             )
             # Apply hour filter to the data (all dates)
             df_filtered = df_filtered[df_filtered['Hour'] <= selected_max_hour].copy()
@@ -1827,8 +1716,7 @@ def create_pivot_table_analysis(df):
                         "📊 Select Analysis Dimension:",
                         options=analysis_dimensions,
                         index=0,
-                        help="Choose which dimension to analyze for top/bottom performance",
-                        key="analysis_dimension_selectbox"
+                        help="Choose which dimension to analyze for top/bottom performance"
                     )
                     
                     if selected_dimension in df_filtered.columns:
@@ -2525,16 +2413,14 @@ def create_pivot_table_analysis(df):
                 "Select value to aggregate:",
                 options=available_numeric,
                 index=0 if available_numeric else None,
-                help="Choose numeric column to aggregate",
-                key="pivot_values_selectbox"
+                help="Choose numeric column to aggregate"
             )
             
             aggregation = st.selectbox(
                 "Aggregation function:",
                 options=['sum', 'mean', 'count', 'median', 'std', 'min', 'max'],
                 index=0,
-                help="Choose how to aggregate the values",
-                key="pivot_aggregation_selectbox"
+                help="Choose how to aggregate the values"
             )
         
         if not rows or not values:
@@ -2651,23 +2537,19 @@ def main():
     # Sidebar controls
     with st.sidebar:
         st.subheader("Data Source Settings")
-        st.success("🔗 Connected to AWS MySQL Database")
-        st.caption(f"Host: {db_host}")
+        data_source = "MySQL"  # Default data source (MySQL only)
+        st.info(f"Using {data_source} as the data source.")
 
-        # Date range filter (Default: Month start to today in UAE timezone)
+        # Date range filter (Default: Month-To-Date)
         st.subheader("Date Range Filter")
-        # Use UAE timezone for determining 'today' and default date range
-        uae_tz = pytz.timezone('Asia/Dubai')
-        uae_now = datetime.now(uae_tz)
-        today = uae_now.date()  # Today according to UAE timezone
-        default_start = today.replace(day=1)  # Start of current month in UAE timezone
-        # Set end date to today to capture all of today's data in UAE timezone
-        default_end = today  # Today's date in UAE timezone to capture current day data
+        today = datetime.now().date()
+        default_start = today.replace(day=1)  # Start of current month
+        default_end = today
         date_range = st.date_input(
             "Select date range",
             value=(default_start, default_end),
-            min_value=today - timedelta(days=90),
-            max_value=today + timedelta(days=30)  # Allow future dates
+            min_value=today - timedelta(days=60),
+            max_value=today
         )
         # Ensure date_range is always a tuple (start, end)
         if isinstance(date_range, tuple) and len(date_range) == 2:
@@ -2692,14 +2574,8 @@ def main():
             st.caption("No brand data available.")
 
         # Calculate days_back for backward compatibility (for MySQL/BigQuery loaders)
-        days_back = max((end_date - start_date).days + 1, 30)  # Ensure minimum 30 days
-        display_days = (end_date - start_date).days + 1
-        st.info(f"📊 Month-to-Latest: {display_days} days ({start_date} to {end_date})")
-        st.caption(f"Capturing all available data from month start to latest date for accurate sync")
-        # Show UAE timezone info
-        st.success(f"🇦🇪 UAE Time: {uae_now.strftime('%Y-%m-%d %H:%M:%S %Z')}")
-        st.caption("Dashboard follows UAE timezone (Asia/Dubai +04:00) for data loading")
-        refresh_button = st.button("🔄 Refresh Data", help="Always fetches latest data from server, bypassing cache")
+        days_back = (today - start_date).days + 1
+        refresh_button = st.button("Refresh Data")
 
         # Add a progress indicator in sidebar
         if 'loading_state' not in st.session_state:
@@ -2724,25 +2600,18 @@ def main():
             # Set loading state
             st.session_state.loading_state = "loading"
             # Load data with optimized parameters
-            loading_message = f"Loading optimized data for the last {days_back} days from AWS MySQL..."
+            loading_message = f"Loading optimized data for the last {days_back} days from {data_source}..."
             with st.spinner(loading_message):
-                # If refresh button clicked, bypass cache and fetch fresh data
-                if refresh_button:
-                    # Clear cache to force fresh data load
-                    st.cache_data.clear()
-                    # Load data directly from MySQL, bypassing cache
-                    df = _fetch_data_from_mysql(start_date=start_date, end_date=end_date, days_back=days_back)
-                else:
-                    # Use intelligent caching for automatic loads
-                    df = load_data_from_mysql(start_date=start_date, end_date=end_date, days_back=days_back)
+                # Load data from MySQL database
+                df = load_data_from_mysql(days_back)
                 if not df.empty:
                     df = add_essential_calculated_columns(df)
                     st.session_state.df = df
                     st.session_state.data_loaded = True
                     st.session_state.data_load_time = datetime.now()
-                    st.success(f"✅ Loaded {len(df):,} records from AWS MySQL Database.")
+                    st.success(f"✅ Loaded {len(df):,} records from {data_source}.")
                 else:
-                    st.warning(f"⚠️ No data loaded from AWS MySQL. Please check your connection settings.")
+                    st.warning(f"⚠️ No data loaded from {data_source}. Please check your connection settings.")
             st.session_state.loading_state = "ready"
         except Exception as e:
             st.session_state.loading_state = "ready"
@@ -2785,10 +2654,7 @@ def main():
             "🎮 Shady's Command Center",
             "📅 Period Comparison",
             "📋 Data Overview",
-            "🧹 Data Quality",
-            "💰 Customer Lifetime Value",
-            "🚨 Churn Prediction",
-            "📊 RFM Analysis"
+            "🧹 Data Quality"
         ])
         # 5. Sandbox Tab (User-Friendly & Interactive)
         with tabs[4]:
@@ -2899,36 +2765,7 @@ def main():
         with tabs[0]:
             # Month-to-Date (MTD) Analysis Tab
             st.header("📅 Month-to-Date (MTD) Analysis")
-            
-            # Display current MTD period clearly
-            current_month = datetime.now().strftime("%B %Y")
-            month_start = datetime.now().date().replace(day=1)
-            st.info(f"📊 **Current MTD Period**: {current_month} (from {month_start.strftime('%B 1, %Y')} to latest available data)")
-            
-            # Validate that we're actually showing MTD data
-            if start_date != month_start:
-                st.warning(f"⚠️ **Note**: Date filter is set to {start_date}, but true MTD should start from {month_start}. Consider adjusting the date range for accurate MTD analysis.")
-            
-            # Filter data to only show Month-To-Date (from month start to today)
-            if 'Date' in filtered_df.columns:
-                # Ensure Date is datetime64[ns] for comparison
-                if not pd.api.types.is_datetime64_any_dtype(filtered_df['Date']):
-                    filtered_df['Date'] = pd.to_datetime(filtered_df['Date'])
-                # Filter to only MTD data (from month start to today)
-                month_start_ts = pd.Timestamp(month_start)
-                today_ts = pd.Timestamp(datetime.now().date())
-                mtd_df = filtered_df[(filtered_df['Date'] >= month_start_ts) & (filtered_df['Date'] <= today_ts)].copy()
-                st.success(f"✅ **MTD Data**: Showing {len(mtd_df):,} records from {month_start} to today")
-            else:
-                mtd_df = filtered_df.copy()
-                st.warning("⚠️ No Date column found - showing all filtered data")
-            
-            # Show data range summary
-            if not mtd_df.empty and 'Date' in mtd_df.columns:
-                actual_start = mtd_df['Date'].min().date()
-                actual_end = mtd_df['Date'].max().date()
-                st.caption(f"📈 **Data Range**: {actual_start} to {actual_end} ({len(mtd_df):,} records)")
-            
+            mtd_df = filtered_df.copy()
             # Show summary metrics
             metrics = calculate_metrics(mtd_df)
             if metrics:
@@ -3156,282 +2993,82 @@ def main():
             st.write("### Data Preview")
             st.dataframe(filtered_df.head(20), use_container_width=True)
 
-        # 7. Shady's Command Center Tab (Time-Synchronized Analysis + Pivot Table)
+        # 7. Shady's Command Center Tab (Pivot Table)
         with tabs[6]:
+            # Shady's Command Center Tab (Pivot Table + Custom Prediction)
             st.header("🎮 Shady's Command Center")
-            st.info("📊 Advanced time-synchronized analysis and pivot table insights.")
-            
-            # Show current data range for context
-            if 'Date' in filtered_df.columns:
-                unique_dates = sorted(filtered_df['Date'].unique())
-                if len(unique_dates) >= 1:
-                    date_range = f"{unique_dates[0]} to {unique_dates[-1]}"
-                    st.write(f"**Data Range:** {date_range} ({len(unique_dates)} days)")
-            
-            # --- Time-Synchronized Two-Day Comparison ---
-            st.subheader("🔄 Time-Synchronized Two-Day Comparison")
-            st.info("📊 This analysis compares the latest two days with precise time synchronization for accurate analysis.")
-            
-            if 'Date' in filtered_df.columns and 'ReceivedAt' in filtered_df.columns:
-                # Get unique sorted dates (descending to get latest first)
-                unique_dates = sorted(filtered_df['Date'].unique(), reverse=True)
-                
-                if len(unique_dates) >= 2:
-                    latest_day = unique_dates[0]
-                    second_latest_day = unique_dates[1]
-                    
-                    # Show actual dates instead of "latest" and "second"
-                    st.write(f"**Comparing:** {latest_day} vs {second_latest_day}")
-                    
-                    # Get data for both days
-                    latest_day_df = filtered_df[filtered_df['Date'] == latest_day].copy()
-                    second_latest_day_df = filtered_df[filtered_df['Date'] == second_latest_day].copy()
-                    
-                    if not latest_day_df.empty and not second_latest_day_df.empty:
-                        # Find the latest timestamp on the latest day
-                        latest_timestamp = latest_day_df['ReceivedAt'].max()
-                        latest_time_only = latest_timestamp.time()
-                        
-                        st.write(f"**Latest data timestamp:** {latest_timestamp} (Time: {latest_time_only})")
-                        
-                        # Filter second latest day to only include data up to the same time
-                        second_latest_day_df['ReceivedTime'] = pd.to_datetime(second_latest_day_df['ReceivedAt']).dt.time
-                        time_synced_second_day_df = second_latest_day_df[
-                            second_latest_day_df['ReceivedTime'] <= latest_time_only
-                        ].copy()
-                        
-                        st.write(f"**Time-synchronized comparison:** Comparing full {latest_day} vs {second_latest_day} up to {latest_time_only}")
-                        
-                        # --- Overall Metrics Comparison ---
-                        st.markdown("### 📊 Overall Metrics Comparison")
-                        metrics_cols = ['net_sale', 'Calculated_Discount', 'Profit_Margin']
-                        available_metrics = [col for col in metrics_cols if col in filtered_df.columns]
-                        
-                        if available_metrics:
-                            # Calculate metrics for both periods
-                            latest_metrics = {
-                                'Orders': len(latest_day_df),
-                                **{col: latest_day_df[col].sum() for col in available_metrics}
-                            }
-                            
-                            second_latest_metrics = {
-                                'Orders': len(time_synced_second_day_df),
-                                **{col: time_synced_second_day_df[col].sum() for col in available_metrics}
-                            }
-                            
-                            # Create comparison DataFrame
-                            comparison_df = pd.DataFrame({
-                                f'{latest_day}': latest_metrics,
-                                f'{second_latest_day} (Time-Synced)': second_latest_metrics
-                            })
-                            
-                            # Calculate differences
-                            comparison_df[f'Δ ({latest_day} - {second_latest_day})'] = (
-                                comparison_df[f'{latest_day}'] - 
-                                comparison_df[f'{second_latest_day} (Time-Synced)']
-                            )
-                            
-                            # Calculate percentage change
-                            comparison_df['% Change'] = (
-                                (comparison_df[f'Δ ({latest_day} - {second_latest_day})'] / 
-                                 comparison_df[f'{second_latest_day} (Time-Synced)'].replace(0, 1)) * 100
-                            ).round(2)
-                            
-                            st.dataframe(comparison_df.round(2), use_container_width=True)
-                            
-                            # --- Visual Comparison ---
-                            st.markdown("### 📈 Visual Comparison")
-                            col1, col2 = st.columns(2)
-                            
-                            with col1:
-                                st.write("#### Net Sales Comparison")
-                                if 'net_sale' in available_metrics:
-                                    sales_chart_data = pd.DataFrame({
-                                        'Net Sales': [
-                                            latest_metrics['net_sale'],
-                                            second_latest_metrics['net_sale']
-                                        ]
-                                    }, index=[f'{latest_day}', f'{second_latest_day} (Synced)'])
-                                    st.bar_chart(sales_chart_data)
-                            
-                            with col2:
-                                st.write("#### Orders Comparison")
-                                orders_chart_data = pd.DataFrame({
-                                    'Orders': [
-                                        latest_metrics['Orders'],
-                                        second_latest_metrics['Orders']
-                                    ]
-                                }, index=[f'{latest_day}', f'{second_latest_day} (Synced)'])
-                                st.bar_chart(orders_chart_data)
-                            
-                            # --- Data Quality Information ---
-                            st.write("#### 📋 Data Quality Information")
-                            col1, col2 = st.columns(2)
-                            with col1:
-                                st.metric(f"{latest_day} Records", len(latest_day_df))
-                                st.metric("Latest Timestamp", str(latest_timestamp))
-                            with col2:
-                                st.metric(f"{second_latest_day} Records (Full)", len(second_latest_day_df))
-                                st.metric(f"{second_latest_day} Records (Time-Synced)", len(time_synced_second_day_df))
-                        
-                        else:
-                            st.warning("⚠️ Required metrics columns not found for comparison analysis.")
-                    else:
-                        st.warning("⚠️ Insufficient data for the latest two days.")
-                else:
-                    st.info("📊 Need at least 2 days of data for time-synchronized comparison.")
-            else:
-                st.warning("⚠️ Date and ReceivedAt columns required for time-synchronized analysis.")
-            
-            st.markdown("---")
-            
-            # --- Pivot Table Analysis ---
-            st.subheader("📊 Pivot Table Analysis")
+            # --- Date Filter and Pivot Table Analysis ---
+            # This block sets start_date and end_date for the tab
+            # ...existing code for date filter and pivot table config...
+            # (Find the block where start_date and end_date are set from the tab's date filter)
+            # After the date filter and before displaying the pivot table, insert the prediction logic:
+            # --- Custom Sales Prediction (Removed) ---
+            # If you want to add a new prediction logic, implement here as per your formula
+            # ---
+            st.header("Pivot Table Analysis")
             try:
                 create_pivot_table_analysis(filtered_df)
             except Exception as e:
-                st.error(f"Error in pivot table analysis: {str(e)}")
+                st.error(f"Error in pivot table analysis: {e}")
+            st.write("### Data Preview")
+            st.dataframe(filtered_df.head(20), use_container_width=True)
 
         # 8. Period Comparison Tab
         with tabs[7]:
+            # Period Comparison Tab
             st.header("📅 Period Comparison")
-            
-            # --- Simple Period-over-Period Comparison ---
-            st.subheader("🔍 Period-over-Period Comparison")
-            if 'Date' in filtered_df.columns:
-                # Allow user to select two periods (date ranges)
-                unique_dates = sorted(filtered_df['Date'].unique())
-                if len(unique_dates) >= 2:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0, key=f"period1_selectbox_{hash(str(unique_dates))}")
-                    with col2:
-                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0, key=f"period2_selectbox_{hash(str(unique_dates))}")
-                    
-                    df1 = filtered_df[filtered_df['Date'] == period1]
-                    df2 = filtered_df[filtered_df['Date'] == period2]
-                    
-                    # Key metrics to compare
-                    metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
-                    available_metrics = [col for col in metrics if col in filtered_df.columns]
-                    
-                    if available_metrics:
-                        summary1 = df1[available_metrics].sum(numeric_only=True)
-                        summary2 = df2[available_metrics].sum(numeric_only=True)
-                        diff = summary2 - summary1
-                        
-                        comp_df = pd.DataFrame({
-                            f'{period1}': summary1,
-                            f'{period2}': summary2,
-                            'Δ (Second - First)': diff
-                        })
-                        
-                        st.write("#### Key Metrics Comparison")
-                        st.dataframe(comp_df.round(2))
-                        
-                        # Visualize
-                        if 'net_sale' in available_metrics:
-                            st.write("#### Net Sales Comparison")
-                            st.bar_chart(pd.DataFrame({
-                                'Net Sale': [summary1['net_sale'], summary2['net_sale']]
-                            }, index=[str(period1), str(period2)]))
-                        
-                        # Insights
-                        st.markdown("### 💡 Period Comparison Insights")
-                        if 'net_sale' in available_metrics:
-                            if diff['net_sale'] > 0:
-                                st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
-                            else:
-                                st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
-                        
-                        if 'Profit_Margin' in available_metrics and diff['Profit_Margin'] < 0:
-                            st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
-                        
-                        if 'Calculated_Discount' in available_metrics and diff['Calculated_Discount'] > 0:
-                            st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
-                        
-                        st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
-                    else:
-                        st.warning("⚠️ Required metrics columns not found for comparison.")
-                else:
-                    st.info("Not enough unique dates for period comparison.")
-            else:
-                st.info("Date column not found for period comparison.")
-            
-            # Data preview section
-
-            
-        with tabs[7]:
-            st.header("📅 Period Comparison")
-            
-            # --- Simple Period-over-Period Comparison ---
-            st.subheader("🔍 Period-over-Period Comparison")
-            if 'Date' in filtered_df.columns:
-                # Allow user to select two periods (date ranges)
-                unique_dates = sorted(filtered_df['Date'].unique())
-                if len(unique_dates) >= 2:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0, key=f"period1_selectbox_{hash(str(unique_dates))}")
-                    with col2:
-                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0, key=f"period2_selectbox_{hash(str(unique_dates))}")
-                    
-                    df1 = filtered_df[filtered_df['Date'] == period1]
-                    df2 = filtered_df[filtered_df['Date'] == period2]
-                    
-                    # Key metrics to compare
-                    metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
-                    available_metrics = [col for col in metrics if col in filtered_df.columns]
-                    
-                    if available_metrics:
-                        summary1 = df1[available_metrics].sum(numeric_only=True)
-                        summary2 = df2[available_metrics].sum(numeric_only=True)
-                        diff = summary2 - summary1
-                        
-                        comp_df = pd.DataFrame({
-                            f'{period1}': summary1,
-                            f'{period2}': summary2,
-                            'Δ (Second - First)': diff
-                        })
-                        
-                        st.write("#### Key Metrics Comparison")
-                        st.dataframe(comp_df.round(2))
-                        
-                        # Visualize
-                        if 'net_sale' in available_metrics:
-                            st.write("#### Net Sales Comparison")
-                            st.bar_chart(pd.DataFrame({
-                                'Net Sale': [summary1['net_sale'], summary2['net_sale']]
-                            }, index=[str(period1), str(period2)]))
-                        
-                        # Insights
-                        st.markdown("### 💡 Period Comparison Insights")
-                        if 'net_sale' in available_metrics:
-                            if diff['net_sale'] > 0:
-                                st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
-                            else:
-                                st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
-                        
-                        if 'Profit_Margin' in available_metrics and diff['Profit_Margin'] < 0:
-                            st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
-                        
-                        if 'Calculated_Discount' in available_metrics and diff['Calculated_Discount'] > 0:
-                            st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
-                        
-                        st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
-                    else:
-                        st.warning("⚠️ Required metrics columns not found for comparison.")
-                else:
-                    st.info("Not enough unique dates for period comparison.")
-            else:
-                st.info("Date column not found for period comparison.")
-            
-            # Data preview section
-            st.write("### 📋 Data Preview for Selected Period")
+            st.write("### Data Preview for Selected Period")
             st.dataframe(filtered_df.head(20), use_container_width=True)
+            st.write("### Data Summary")
+            st.dataframe(filtered_df.describe(include='all').T)
 
-        # 9. Data Overview Tab
-        with tabs[8]:
+            # --- Deep Dive: Period-over-Period Comparison ---
+            st.subheader("🔍 Deep Dive: Period-over-Period Comparison")
+            if 'Date' in filtered_df.columns:
+                # Allow user to select two periods (date ranges)
+                unique_dates = sorted(filtered_df['Date'].unique())
+                if len(unique_dates) >= 2:
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0)
+                    with col2:
+                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0)
+                    df1 = filtered_df[filtered_df['Date'] == period1]
+                    df2 = filtered_df[filtered_df['Date'] == period2]
+                    # Key metrics to compare
+                    metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
+                    summary1 = df1[metrics].sum(numeric_only=True)
+                    summary2 = df2[metrics].sum(numeric_only=True)
+                    diff = summary2 - summary1
+                    comp_df = pd.DataFrame({
+                        f'{period1}': summary1,
+                        f'{period2}': summary2,
+                        'Δ (Second - First)': diff
+                    })
+                    st.write("#### Key Metrics Comparison")
+                    st.dataframe(comp_df.round(2))
+                    # Visualize
+                    st.write("#### Net Sales Comparison")
+                    st.bar_chart(pd.DataFrame({'Net Sale': [summary1['net_sale'], summary2['net_sale']]}, index=[str(period1), str(period2)]))
+                    # Insights
+                    st.markdown("### 💡 Period Comparison Insights")
+                    if diff['net_sale'] > 0:
+                        st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
+                    else:
+                        st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
+                    if diff['Profit_Margin'] < 0:
+                        st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
+                    if diff['Calculated_Discount'] > 0:
+                        st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
+                    st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
+                else:
+                    st.info("Not enough unique dates for period comparison.")
+            else:
+                st.info("Date column not found for period comparison.")
+
+        # 8. Data Overview Tab
+        with tabs[7]:
+            # Data Overview Tab
             st.header("📋 Data Overview")
             st.write("### Data Columns and Types")
             st.dataframe(filtered_df.dtypes.reset_index().rename(columns={0: 'dtype', 'index': 'column'}))
@@ -3440,8 +3077,9 @@ def main():
             st.write("### Data Summary")
             st.dataframe(filtered_df.describe(include='all').T)
 
-        # 10. Data Quality Tab
-        with tabs[9]:
+        # 9. Data Quality Tab
+        with tabs[8]:
+            # Data Quality Tab
             st.header("🧹 Data Quality")
             st.write("### Missing Values by Column")
             st.dataframe(filtered_df.isnull().sum().reset_index().rename(columns={0: 'missing', 'index': 'column'}))
@@ -3454,27 +3092,6 @@ def main():
                 st.info("No ReceivedAt column in data.")
             st.write("### Data Preview")
             st.dataframe(filtered_df.head(20), use_container_width=True)
-
-        # 11. Customer Lifetime Value Tab
-        with tabs[10]:
-            if ADVANCED_ANALYTICS_AVAILABLE:
-                display_clv_analysis(filtered_df)
-            else:
-                st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
-
-        # 12. Churn Prediction Tab  
-        with tabs[11]:
-            if ADVANCED_ANALYTICS_AVAILABLE:
-                display_churn_prediction(filtered_df)
-            else:
-                st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
-
-        # 13. RFM Analysis Tab
-        with tabs[12]:
-            if ADVANCED_ANALYTICS_AVAILABLE:
-                display_rfm_analysis(filtered_df)
-            else:
-                st.error("Advanced analytics module not available. Please ensure advanced_analytics.py is in the same directory.")
 
 if __name__ == "__main__":
     try:
