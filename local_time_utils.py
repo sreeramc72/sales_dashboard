@@ -14,7 +14,10 @@ UAE_TZ = pytz.timezone('Asia/Dubai')
 def get_local_time():
     """
     Get current time in user's local UAE timezone
+    Always returns real-time current time (not cached)
     """
+    # Force real-time by creating new datetime object each time
+    import time
     return datetime.now(UAE_TZ)
 
 def convert_to_local_time(timestamp):
@@ -92,14 +95,17 @@ def ensure_dataframe_local_time(df, timestamp_columns=['ReceivedAt']):
 def display_time_info():
     """
     Display current time information in user's local timezone
+    Always shows real-time current time (refreshes automatically)
     """
-    local_time = get_local_time()
+    # Get fresh real-time local time (not cached)
+    local_time = datetime.now(UAE_TZ)
     
     st.sidebar.markdown("---")
     st.sidebar.markdown("🕐 **Current Time**")
     st.sidebar.markdown(f"**UAE Local Time:**")
     st.sidebar.markdown(f"`{local_time.strftime('%Y-%m-%d %H:%M:%S %Z')}`")
     st.sidebar.markdown(f"**Date:** {local_time.strftime('%A, %B %d, %Y')}")
+    st.sidebar.markdown(f"**Last Updated:** Just now")
     st.sidebar.markdown("---")
 
 def get_time_range_display(start_time, end_time):

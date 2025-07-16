@@ -1,22 +1,114 @@
-# --- AWS MySQL Connection Test Utility ---
-def test_aws_mysql_connection():
-    import os
-    from sqlalchemy.exc import SQLAlchemyError
-    # Load from environment variables (from .env via dotenv)
-    endpoint = os.getenv("MySQL_HOST") or os.getenv("MYSQL_HOST")
-    db_name = os.getenv("MYSQL_DATABASE") or os.getenv("MYSQL_DB")
-    username = os.getenv("MYSQL_USER")
-    password = os.getenv("MYSQL_PASSWORD")
-    port = int(os.getenv("MYSQL_PORT") or 3306)
-    try:
-        engine = get_aws_mysql_engine(endpoint, db_name, username, password, port)
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-        st.sidebar.success(f"AWS MySQL connection successful! Host: {endpoint}")
-    except SQLAlchemyError as e:
-        st.sidebar.error(f"AWS MySQL connection failed: {e}")
-    except Exception as e:
-        st.sidebar.error(f"Unexpected error: {e}")
+def inject_professional_theme():
+    """Injects a modern, professional, and accessible color palette via custom CSS."""
+    st.markdown(
+        """
+        <style>
+        /* Base background and text */
+        .stApp {
+            background-color: #f7f9fb;
+            color: #1a1a1a;
+            font-family: 'Segoe UI', 'Roboto', 'Arial', sans-serif;
+        }
+        /* Main headers */
+        h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+            color: #1a237e;
+        }
+        /* Subheaders and section titles */
+        .stMarkdown h4, .stMarkdown h5, .stMarkdown h6 {
+            color: #1565c0;
+        }
+        /* Sidebar */
+        section[data-testid="stSidebar"] {
+            background: linear-gradient(180deg, #e3eafc 0%, #f7f9fb 100%);
+            color: #1a1a1a;
+        }
+        /* Tabs */
+        .stTabs [data-baseweb="tab"] {
+            background-color: #e3eafc;
+            color: #1a237e;
+            border-radius: 6px 6px 0 0;
+            margin-right: 2px;
+        }
+        .stTabs [aria-selected="true"] {
+            background: #1565c0;
+            color: #fff;
+        }
+        /* Dataframe/table */
+        .stDataFrame, .stTable {
+            background-color: #fff;
+            border-radius: 8px;
+            border: 1px solid #e3eafc;
+        }
+        /* Buttons */
+        button[kind="primary"], .stButton>button {
+            background-color: #1565c0;
+            color: #fff;
+            border-radius: 6px;
+            border: none;
+            font-weight: 600;
+        }
+        button[kind="primary"]:hover, .stButton>button:hover {
+            background-color: #1a237e;
+            color: #fff;
+        }
+        /* Info, success, warning, error boxes */
+        .stAlert[data-testid="stAlert-info"] {
+            background-color: #e3f2fd;
+            color: #1565c0;
+        }
+        .stAlert[data-testid="stAlert-success"] {
+            background-color: #e8f5e9;
+            color: #2e7d32;
+        }
+        .stAlert[data-testid="stAlert-warning"] {
+            background-color: #fffde7;
+            color: #f9a825;
+        }
+        .stAlert[data-testid="stAlert-error"] {
+            background-color: #ffebee;
+            color: #c62828;
+        }
+        /* Progress bar */
+        .stProgress > div > div > div > div {
+            background-color: #1565c0;
+        }
+        /* Metric cards */
+        .stMetric {
+            background: #e3eafc;
+            border-radius: 8px;
+            padding: 8px 0;
+        }
+        /* Expander */
+        .stExpander {
+            background: #f7f9fb;
+            border: 1px solid #e3eafc;
+            border-radius: 8px;
+        }
+        /* Remove Streamlit watermark */
+        footer {visibility: hidden;}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+import sys
+import threading
+
+# --- Suppress watchdog RuntimeError: dictionary changed size during iteration ---
+def _suppress_watchdog_runtime_error():
+    """Suppresses the specific RuntimeError from watchdog's file watcher."""
+    orig_excepthook = threading.excepthook
+    def custom_excepthook(args):
+        if (
+            isinstance(args.exc_value, RuntimeError)
+            and 'dictionary changed size during iteration' in str(args.exc_value)
+            and 'watchdog' in str(args.exc_traceback)
+        ):
+            # Ignore this error
+            return
+        orig_excepthook(args)
+    threading.excepthook = custom_excepthook
+
+_suppress_watchdog_runtime_error()
 
 
 import os
@@ -142,31 +234,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, r2_score
 from dotenv import load_dotenv
 
-# Suppress warnings and configure logging
-warnings.filterwarnings('ignore')
 
-# Configure logging to suppress WebSocket errors
-logging.getLogger('tornado.access').setLevel(logging.ERROR)
-logging.getLogger('tornado.application').setLevel(logging.ERROR)
-logging.getLogger('tornado.general').setLevel(logging.ERROR)
-
-# Suppress specific WebSocket errors
-class WebSocketErrorFilter(logging.Filter):
-    def filter(self, record):
-        # Filter out WebSocket closed errors
-        if 'WebSocketClosedError' in str(record.getMessage()):
-            return False
-        if 'Stream is closed' in str(record.getMessage()):
-            return False
-        if 'write_message' in str(record.getMessage()):
-            return False
-        return True
-
-# Apply filter to relevant loggers
-for logger_name in ['tornado.websocket', 'tornado.iostream']:
-    logger = logging.getLogger(logger_name)
-    logger.addFilter(WebSocketErrorFilter())
-    logger.setLevel(logging.ERROR)
 
 # Load environment variables
 import pathlib
@@ -175,40 +243,101 @@ import pathlib
 dotenv_path = pathlib.Path(__file__).parent / ".env"
 load_dotenv(dotenv_path, override=True)
 
-# --- Debug: Show loaded MySQL environment variables in sidebar ---
-# Debug section removed as SQL is now loading correctly
 
 # Configure page
 st.set_page_config(
     page_title="Growth Team Dashboard",
-    page_icon="📊",
+    page_icon=None,  # No emoji for classic elegance
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Custom CSS for better styling
+# Classic, elegant, and professional CSS with improved color palette
 st.markdown("""
 <style>
-    .main-header {
-        font-size: 3rem;
-        font-weight: bold;
-        color: #1f77b4;
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .metric-card {
-        background-color: #f0f2f6;
-        padding: 1rem;
-        border-radius: 0.5rem;
-        border-left: 5px solid #1f77b4;
-    }
-    .section-header {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #2c3e50;
-        margin-top: 2rem;
-        margin-bottom: 1rem;
-    }
+body, .stApp {
+    background: #f4f6fa !important;
+    color: #1a2238 !important;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.main-header {
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #0a1931;
+    text-align: center;
+    margin-bottom: 2rem;
+    letter-spacing: 0.04em;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+    border-bottom: 2px solid #e0c36e;
+    padding-bottom: 0.5rem;
+}
+.metric-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    border: 1px solid #e5e5e5;
+    box-shadow: 0 2px 12px 0 rgba(10,25,49,0.07);
+    padding: 1.25rem;
+    color: #0a1931;
+    margin-bottom: 1.25rem;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.section-header {
+    font-size: 1.35rem;
+    font-weight: 600;
+    color: #e0c36e;
+    margin-top: 2rem;
+    margin-bottom: 1rem;
+    letter-spacing: 0.02em;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.stButton>button {
+    background: #0a1931;
+    color: #fff;
+    border-radius: 0.4rem;
+    border: none;
+    font-weight: 600;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+    box-shadow: 0 1px 4px rgba(10,25,49,0.10);
+    transition: background 0.2s, color 0.2s;
+}
+.stButton>button:hover {
+    background: #e0c36e;
+    color: #0a1931;
+}
+.stAlert, .stSuccess, .stWarning, .stError {
+    background: #fffbe6 !important;
+    color: #1a2238 !important;
+    border-left: 5px solid #e0c36e !important;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.stDataFrame, .stTable {
+    background: #fff;
+    color: #0a1931;
+    border-radius: 0.4rem;
+    border: 1px solid #e5e5e5;
+    box-shadow: 0 1px 6px rgba(10,25,49,0.08);
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {
+    color: #0a1931;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.stMarkdown {
+    color: #1a2238;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.stSidebar {
+    background: #f4f6fa !important;
+    color: #1a2238 !important;
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
+.stGraph {
+    border: 1px solid #e5e5e5;
+    background: #fff;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 6px rgba(10,25,49,0.08);
+    font-family: 'Georgia', 'Times New Roman', serif !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -451,7 +580,7 @@ def get_data_hash(start_date, end_date):
         return hashlib.md5(hash_input.encode()).hexdigest()
     return None
 
-@st.cache_data(ttl=120, show_spinner="🔄 Loading fresh data from MySQL...")  # Cache for 2 minutes to ensure fresh data
+@st.cache_data(ttl=120, show_spinner="Loading fresh data from MySQL...")  # Cache for 2 minutes to ensure fresh data
 def _load_data_with_hash(data_hash, start_date=None, end_date=None, days_back=7, max_retries=3):
     """
     Internal function to load data with hash-based caching.
@@ -478,7 +607,7 @@ def load_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retrie
     
     if current_hash:
         # Use hash-based caching - will only reload if hash changes (new data available)
-        with st.spinner("🔍 Checking for new data..."):
+        with st.spinner("Checking for new data..."):
             data = _load_data_with_hash(current_hash, start_date, end_date, days_back, max_retries)
             
             # Show cache status
@@ -488,18 +617,18 @@ def load_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retrie
                 with cache_info:
                     col1, col2, col3 = st.columns([2, 2, 1])
                     with col1:
-                        st.success(f"📊 **Data Status**: Using intelligent cache (10-min refresh)")
+                        st.success(f"Data Status: Using intelligent cache (10-min refresh)")
                     with col2:
                         st.info(f"🕐 **Latest Data**: {latest_timestamp}")
                     with col3:
-                        if st.button("🔄 Force Refresh"):
+                        if st.button("Force Refresh"):
                             st.cache_data.clear()
                             st.rerun()
             
             return data
     else:
         # Fallback to direct loading if hash generation fails
-        st.warning("⚠️ Cache check failed, loading data directly")
+        st.warning("Cache check failed, loading data directly")
         return _fetch_data_from_mysql(start_date, end_date, days_back, max_retries)
 
 def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retries=3):
@@ -525,7 +654,7 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
         try:
             # Show loading indicator with retry information if applicable
             retry_msg = f" (Attempt {retry_count + 1}/{max_retries})" if retry_count > 0 else ""
-            with st.spinner(f"🔄 Loading data from MySQL for last {days_back} days{retry_msg}..."):
+            with st.spinner(f"Loading data from MySQL for last {days_back} days{retry_msg}..."):
                 # Get AWS MySQL credentials from Streamlit secrets
                 try:
                     aws_host = st.secrets["MYSQL_HOST"]
@@ -598,7 +727,7 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
                     # Show actual data range loaded for debugging data freshness issues
                     latest_in_data = df['ReceivedAt'].max()
                     earliest_in_data = df['ReceivedAt'].min()
-                    st.info(f"📊 Loaded {len(df)} records | Data range: {earliest_in_data} to {latest_in_data}")
+                    st.info(f"Loaded {len(df)} records | Data range: {earliest_in_data} to {latest_in_data}")
                     st.caption(f"Query range: {start_date_str} to {end_date_str}")
                     # Show timezone and server info for debugging
                     st.caption(f"🕐 MySQL timezone: {mysql_tz} | MySQL server time: {mysql_now}")
@@ -640,11 +769,11 @@ def _fetch_data_from_mysql(start_date=None, end_date=None, days_back=7, max_retr
             st.error(f"Database error: {error_message}")
             # Check for specific connection errors
             if "Access denied" in error_message:
-                st.error("⚠️ Authentication failed. Please check your database credentials.")
+                st.error("Authentication failed. Please check your database credentials.")
             elif "Can't connect" in error_message or "Connection refused" in error_message:
-                st.error("⚠️ Cannot connect to database server. Please check if the server is running and accessible.")
+                st.error("Cannot connect to database server. Please check if the server is running and accessible.")
             elif "Unknown database" in error_message:
-                st.error("⚠️ Database does not exist. Please check your database name.")
+                st.error("Database does not exist. Please check your database name.")
             # Increment retry counter and wait before retrying
             retry_count += 1
             if retry_count < max_retries:
@@ -678,15 +807,31 @@ def calculate_metrics(df):
     if 'GrossPrice' in df.columns and 'Discount' in df.columns:
         df = df[df['GrossPrice'] != df['Discount']].copy()
 
+    def safe_int(val):
+        try:
+            if pd.isna(val):
+                return 0
+            return int(round(val))
+        except Exception:
+            return 0
+
+    def safe_float(val):
+        try:
+            if pd.isna(val):
+                return 0
+            return float(round(val))
+        except Exception:
+            return 0
+
     metrics = {
-        'total_orders': len(df),
-        'total_revenue': df['net_sale'].sum(),
-        'avg_order_value': df['net_sale'].mean(),
-        'total_customers': df['CustomerName'].nunique(),
-        'total_discount': df['Calculated_Discount'].sum(),
-        'discount_rate': (df['Calculated_Discount'].sum() / df['GrossPrice'].sum()) * 100 if df['GrossPrice'].sum() > 0 else 0,
-        'avg_delivery_fee': df['Delivery'].mean(),
-        'total_tips': df['Tips'].sum()
+        'total_orders': safe_int(len(df)),
+        'total_revenue': safe_int(df['net_sale'].sum()),
+        'avg_order_value': safe_int(df['net_sale'].mean()),
+        'total_customers': safe_int(df['CustomerName'].nunique()),
+        'total_discount': safe_int(df['Calculated_Discount'].sum()),
+        'discount_rate': safe_int((df['Calculated_Discount'].sum() / df['GrossPrice'].sum()) * 100) if df['GrossPrice'].sum() > 0 else 0,
+        'avg_delivery_fee': safe_int(df['Delivery'].mean()),
+        'total_tips': safe_int(df['Tips'].sum())
     }
 
     return metrics
@@ -888,8 +1033,11 @@ def create_customer_behavior_analysis(df):
         display_cols.append('Address')
     display_cols += ['Total_Spent', 'Order_Count', 'Total_Discount', 'Customer_Lifetime_Days', 'Segment']
     st.subheader('👤 Customer Table (Name, Telephone, Address)')
+    # Round numeric columns to int for display (except Segment)
+    for col in ['Total_Spent', 'Order_Count', 'Total_Discount', 'Customer_Lifetime_Days']:
+        if col in customer_stats.columns:
+            customer_stats[col] = customer_stats[col].apply(lambda x: int(round(x)) if pd.notna(x) else 0)
     # Fix Arrow serialization error: ensure all columns are string or numeric (esp. Address, Telephone)
-    # Fix Arrow serialization error: ensure all columns are string, numeric, or datetime (esp. Address, Telephone)
     for col in display_cols:
         if customer_stats[col].dtype == 'O':
             # Convert lists, dicts, sets, or other objects to string
@@ -979,6 +1127,10 @@ def create_discount_performance_analysis(df):
     }).round(2)
     discount_analysis.columns = ['Total_Net_Sales', 'Average_Order_Value', 'Number_of_Orders', 'Average_Discount_Amount', 'Total_CM', 'Average_CM']
     discount_analysis = discount_analysis.reset_index()
+    # Round all numeric columns to int for display
+    for col in ['Total_Net_Sales', 'Average_Order_Value', 'Number_of_Orders', 'Average_Discount_Amount', 'Total_CM', 'Average_CM']:
+        if col in discount_analysis.columns:
+            discount_analysis[col] = discount_analysis[col].apply(lambda x: int(round(x)) if pd.notna(x) else 0)
 
     # --- Visualization (existing) ---
     fig = make_subplots(
@@ -1182,14 +1334,14 @@ def create_pivot_table_analysis(df):
     # (Moved to a dedicated function, call only in Discount Performance tab)
     """Create interactive pivot table analysis"""
     if df.empty:
-        st.warning("⚠️ No data available for pivot table analysis")
+        st.warning("No data available for pivot table analysis")
         return
 
     # Exclude 100% discounted orders (GrossPrice == Discount)
     if 'GrossPrice' in df.columns and 'Discount' in df.columns:
         df = df[df['GrossPrice'] != df['Discount']].copy()
 
-    st.markdown('<div class="section-header">📊 Interactive Pivot Table Analysis</div>', unsafe_allow_html=True)
+    st.markdown('<div class="section-header">Interactive Pivot Table Analysis</div>', unsafe_allow_html=True)
     
     # Prediction Section at the top
     st.subheader("🔮 Today's Predictions")
@@ -1261,9 +1413,9 @@ def create_pivot_table_analysis(df):
                         delta=None
                     )
                 
-                st.info(f"📊 **Predictions based on**: {len(daily_stats)} days of historical data with {trend_factor:.2f}x trend factor")
+                st.info(f"Predictions based on: {len(daily_stats)} days of historical data with {trend_factor:.2f}x trend factor")
             else:
-                st.warning("⚠️ Insufficient historical data for predictions (need at least 7 days)")
+                st.warning("Insufficient historical data for predictions (need at least 7 days)")
         else:
             st.warning("⚠️ Date column not found. Unable to generate predictions.")
     except Exception as e:
@@ -2604,6 +2756,8 @@ def suppress_websocket_errors():
     return suppress_stderr()
 
 def main():
+    # Inject professional theme
+    inject_professional_theme()
     # --- Recommendations for further analysis and decision making ---
     with st.expander("💡 Dashboard Recommendations & Advanced Analysis Features"):
         st.markdown("""
@@ -3295,47 +3449,56 @@ def main():
         # 8. Period Comparison Tab
         with tabs[7]:
             st.header("📅 Period Comparison")
-            
             # --- Simple Period-over-Period Comparison ---
             st.subheader("🔍 Period-over-Period Comparison")
+            # Generate a unique key suffix using uniqueorderid or sequence number if available, else fallback to hash
+            if 'uniqueorderid' in filtered_df.columns:
+                unique_key_suffix = str(filtered_df['uniqueorderid'].iloc[0])
+            elif 'sequence number' in filtered_df.columns:
+                unique_key_suffix = str(filtered_df['sequence number'].iloc[0])
+            else:
+                unique_key_suffix = str(hash(str(filtered_df.index.values)))
             if 'Date' in filtered_df.columns:
                 # Allow user to select two periods (date ranges)
                 unique_dates = sorted(filtered_df['Date'].unique())
                 if len(unique_dates) >= 2:
                     col1, col2 = st.columns(2)
                     with col1:
-                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0, key=f"period1_selectbox_{hash(str(unique_dates))}")
+                        period1 = st.selectbox(
+                            "Select First Period (Date)",
+                            unique_dates,
+                            index=0,
+                            key=f"period1_selectbox_{unique_key_suffix}_tab7a1"
+                        )
                     with col2:
-                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0, key=f"period2_selectbox_{hash(str(unique_dates))}")
-                    
+                        period2 = st.selectbox(
+                            "Select Second Period (Date)",
+                            unique_dates,
+                            index=1 if len(unique_dates) > 1 else 0,
+                            key=f"period2_selectbox_{unique_key_suffix}_tab7a1"
+                        )
                     df1 = filtered_df[filtered_df['Date'] == period1]
                     df2 = filtered_df[filtered_df['Date'] == period2]
-                    
                     # Key metrics to compare
                     metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
                     available_metrics = [col for col in metrics if col in filtered_df.columns]
-                    
                     if available_metrics:
                         summary1 = df1[available_metrics].sum(numeric_only=True)
                         summary2 = df2[available_metrics].sum(numeric_only=True)
                         diff = summary2 - summary1
-                        
                         comp_df = pd.DataFrame({
                             f'{period1}': summary1,
                             f'{period2}': summary2,
                             'Δ (Second - First)': diff
                         })
-                        
                         st.write("#### Key Metrics Comparison")
                         st.dataframe(comp_df.round(2))
-                        
                         # Visualize
                         if 'net_sale' in available_metrics:
                             st.write("#### Net Sales Comparison")
                             st.bar_chart(pd.DataFrame({
                                 'Net Sale': [summary1['net_sale'], summary2['net_sale']]
                             }, index=[str(period1), str(period2)]))
-                        
                         # Insights
                         st.markdown("### 💡 Period Comparison Insights")
                         if 'net_sale' in available_metrics:
@@ -3343,13 +3506,10 @@ def main():
                                 st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
                             else:
                                 st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
-                        
                         if 'Profit_Margin' in available_metrics and diff['Profit_Margin'] < 0:
                             st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
-                        
                         if 'Calculated_Discount' in available_metrics and diff['Calculated_Discount'] > 0:
                             st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
-                        
                         st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
                     else:
                         st.warning("⚠️ Required metrics columns not found for comparison.")
@@ -3357,79 +3517,9 @@ def main():
                     st.info("Not enough unique dates for period comparison.")
             else:
                 st.info("Date column not found for period comparison.")
-            
             # Data preview section
 
             
-        with tabs[7]:
-            st.header("📅 Period Comparison")
-            
-            # --- Simple Period-over-Period Comparison ---
-            st.subheader("🔍 Period-over-Period Comparison")
-            if 'Date' in filtered_df.columns:
-                # Allow user to select two periods (date ranges)
-                unique_dates = sorted(filtered_df['Date'].unique())
-                if len(unique_dates) >= 2:
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        period1 = st.selectbox("Select First Period (Date)", unique_dates, index=0, key=f"period1_selectbox_{hash(str(unique_dates))}")
-                    with col2:
-                        period2 = st.selectbox("Select Second Period (Date)", unique_dates, index=1 if len(unique_dates) > 1 else 0, key=f"period2_selectbox_{hash(str(unique_dates))}")
-                    
-                    df1 = filtered_df[filtered_df['Date'] == period1]
-                    df2 = filtered_df[filtered_df['Date'] == period2]
-                    
-                    # Key metrics to compare
-                    metrics = ['net_sale', 'OrderID', 'Calculated_Discount', 'Profit_Margin']
-                    available_metrics = [col for col in metrics if col in filtered_df.columns]
-                    
-                    if available_metrics:
-                        summary1 = df1[available_metrics].sum(numeric_only=True)
-                        summary2 = df2[available_metrics].sum(numeric_only=True)
-                        diff = summary2 - summary1
-                        
-                        comp_df = pd.DataFrame({
-                            f'{period1}': summary1,
-                            f'{period2}': summary2,
-                            'Δ (Second - First)': diff
-                        })
-                        
-                        st.write("#### Key Metrics Comparison")
-                        st.dataframe(comp_df.round(2))
-                        
-                        # Visualize
-                        if 'net_sale' in available_metrics:
-                            st.write("#### Net Sales Comparison")
-                            st.bar_chart(pd.DataFrame({
-                                'Net Sale': [summary1['net_sale'], summary2['net_sale']]
-                            }, index=[str(period1), str(period2)]))
-                        
-                        # Insights
-                        st.markdown("### 💡 Period Comparison Insights")
-                        if 'net_sale' in available_metrics:
-                            if diff['net_sale'] > 0:
-                                st.write(f"🟢 Net sales increased by {diff['net_sale']:.2f} from {period1} to {period2}.")
-                            else:
-                                st.write(f"🔴 Net sales decreased by {abs(diff['net_sale']):.2f} from {period1} to {period2}.")
-                        
-                        if 'Profit_Margin' in available_metrics and diff['Profit_Margin'] < 0:
-                            st.write(f"⚠️ Profit margin dropped by {abs(diff['Profit_Margin']):.2f}. Review cost or discounting.")
-                        
-                        if 'Calculated_Discount' in available_metrics and diff['Calculated_Discount'] > 0:
-                            st.write(f"🔎 Discount outlay increased by {diff['Calculated_Discount']:.2f}. Assess if this drove incremental sales.")
-                        
-                        st.write("• Use these insights to identify periods of strong or weak performance and investigate drivers.")
-                    else:
-                        st.warning("⚠️ Required metrics columns not found for comparison.")
-                else:
-                    st.info("Not enough unique dates for period comparison.")
-            else:
-                st.info("Date column not found for period comparison.")
-            
-            # Data preview section
-            st.write("### 📋 Data Preview for Selected Period")
-            st.dataframe(filtered_df.head(20), use_container_width=True)
-
         # 9. Data Overview Tab
         with tabs[8]:
             st.header("📋 Data Overview")
